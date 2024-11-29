@@ -1,11 +1,12 @@
 import {
+    cloneWithScope,
     createAppServicesInstance,
+    getInstanceBinder,
     getServiceBinder,
     isServiceAware,
-    SCOPE_INSTANCE,
     SCOPE_PROTOTYPE,
+    SCOPE_REQUEST,
     SCOPE_SINGLETON,
-    ServicesContext
 } from "../injection/ServicesContext.mjs";
 import sinon from "sinon";
 import {getProvider} from "../injection/baseServices.mjs";
@@ -65,7 +66,7 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
     test.beforeEach(function () {
         anInstance = {}
         // Initialize a new ServicesContext with factories and scopes
-        servicesContext = new ServicesContext({
+        servicesContext = createAppServicesInstance({
             scopes: {
                 [SCOPE_SINGLETON]: {
                     anInstance
@@ -80,9 +81,9 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
                     factory: () => new PrototypeClass(),
                     scope: SCOPE_PROTOTYPE
                 },
-                instanceService: {
+                requestService: {
                     factory: () => new InstanceClass(),
-                    scope: SCOPE_INSTANCE
+                    scope: SCOPE_REQUEST
                 },
                 factoryFromClass: ClassWithCtorArgs
             }
@@ -91,8 +92,8 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
 
     test.describe('Provider Scope Management', function () {
         test('should return the same instance for a singleton-scoped service from provider', function () {
-            const singletonService1 = servicesContext.provider.singletonService();
-            const singletonService2 = servicesContext.provider.singletonService();
+            const singletonService1 = getProvider(servicesContext).singletonService();
+            const singletonService2 = getProvider(servicesContext).singletonService();
 
             // Should return the same instance
             expect(singletonService1).to.equal(singletonService2);
@@ -100,33 +101,15 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         });
 
         test('should return a new instance for a prototype-scoped service from provider', function () {
-            const prototypeService1 = servicesContext.provider.prototypeService();
-            const prototypeService2 = servicesContext.provider.prototypeService();
+            const prototypeService1 = getProvider(servicesContext).prototypeService();
+            const prototypeService2 = getProvider(servicesContext).prototypeService();
 
             // Should return different instances
             expect(prototypeService1).to.not.equal(prototypeService2);
             expect(prototypeService1.name).to.equal('prototypeClass');
         });
 
-        test('should throw an error if an instance-scoped service is requested without manual provision', function () {
-            expect(() => servicesContext.provider.instanceService()).to.throw(Error, /Provide the instance/);
-        });
 
-        test('should have default SCOPE_INSTANCE', () => {
-            expect(servicesContext.scopes).to.have.property(SCOPE_INSTANCE);
-        })
-
-        test('should allow manual provision of instance-scoped services', function () {
-            // Manually provide an instance-scoped service
-            servicesContext.scopes[SCOPE_INSTANCE] = {
-                instanceService: new InstanceClass()
-            };
-
-            const instanceService = servicesContext.provider.instanceService();
-
-            // Should return the manually provided instance
-            expect(instanceService.name).to.equal('instanceClass');
-        });
     });
 
     test.describe('getServiceBinder for Auto-Wiring and Instance Creation', function () {
@@ -150,7 +133,7 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
             expect(isServiceAware(unawareInstance)).to.be.true;
 
             expect(isServiceAware(anInstance)).to.be.false;
-            expect(isServiceAware(getProvider(servicesContext).anInstance())).to.be.true;
+            expect(() => getProvider(servicesContext).anInstance()).to.throw(Error, /Provide a factory or a class for "anInstance"/);
 
             const instance = binder.createInstance(AutoWiredClass);
             expect(isServiceAware(instance)).to.be.true;
@@ -171,7 +154,7 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
             });
 
             // Initialize ServicesContext with the factorySpy as the factory for the singletonService
-            servicesContext = new ServicesContext({
+            servicesContext = createAppServicesInstance({
                 factories: {
                     singletonService: {
                         factory: factorySpy,
@@ -181,7 +164,7 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
             });
 
             // Retrieve the singletonService through the provider, which should invoke the factory
-            const singletonService = servicesContext.provider.singletonService();
+            const singletonService = getProvider(servicesContext).singletonService();
 
             // Check if the factory was called with the correct argument (ServicesContext)
             expect(factorySpy.calledOnce).to.be.true; // Ensure the factory was called exactly once
@@ -194,24 +177,22 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
 
     test.describe('Error Handling for Provider and Binder', function () {
         test('should throw an error if the provider is asked for an undefined service', function () {
-            expect(() => servicesContext.provider.undefinedService())
-                .to.throw(Error, 'Provide the instance for "undefinedService" or set its scope and provide a factory function');
+            expect(() => getProvider(servicesContext).undefinedService())
+                .to.throw(Error, 'Provide a factory or a class for "undefinedService"');
         });
 
         test('should throw an error if scope is not defined for a service', function () {
-            servicesContext.factories.customService = {
-                factory: () => new SingletonClass(),
-                scope: 'undefinedScope'
-            };
+            servicesContext = createAppServicesInstance({
+                factories: {
+                    customService: {
+                        factory: () => new SingletonClass(),
+                        scope: 'undefinedScope'
+                    }
+                }
+            });
 
-            expect(() => servicesContext.provider.customService()).to.throw(Error, /Define scope "undefinedScope"/);
+            expect(() => getProvider(servicesContext).customService()).to.throw(Error, /Define scope "undefinedScope"/);
         });
-    });
-
-    test('getFactoryForKey throws when neither class nor factory definition exist', async () => {
-        let servicesContext = new ServicesContext();
-
-        expect(() => servicesContext.getFactoryForKey('testKey')).to.throw();
     });
 
     test("should create services without options", () => {
@@ -226,4 +207,52 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         expect(instance.arg1).to.equal('a');
         expect(instance.arg2).to.equal('b');
     })
+
+
+    test('cloneWithScope should clone servicesContext with a new scope', function () {
+        let cloneServicesContext = cloneWithScope(servicesContext, SCOPE_REQUEST);
+        expect(cloneServicesContext).to.not.equal(servicesContext);
+        expect(isServiceAware(cloneServicesContext)).to.be.true;
+    });
+
+    test('cloneWithScope clone should share parent scopes', function () {
+        let cloneServicesContext = cloneWithScope(servicesContext, SCOPE_REQUEST);
+
+        expect(getProvider(cloneServicesContext).singletonService()).to
+            .equal(getProvider(servicesContext).singletonService());
+    });
+
+    test('cloneWithScope clone not should share new scope', function () {
+        let cloneServicesContext = cloneWithScope(servicesContext, SCOPE_REQUEST);
+
+        expect(getProvider(cloneServicesContext).requestService()).to.not
+            .equal(getProvider(servicesContext).requestService());
+    });
+
+    test('getInstanceBinder should provide instances directly from an object', function () {
+        let holder = {};
+        let obj1 = {};
+        let obj2 = {};
+
+        getInstanceBinder(holder)
+            .setInstance(obj1, 'custom1')
+            .setInstance(obj2, 'custom2');
+
+        expect(getProvider(holder).custom1()).to.equal(obj1);
+        expect(getProvider(holder).custom2()).to.equal(obj2);
+    });
+
+    test('provider should return service holder before service aware', function () {
+        let holder = {};
+
+        let obj1 = {};
+
+        getServiceBinder(servicesContext).makeServiceAware(holder);
+
+        getInstanceBinder(holder)
+            .setInstance(obj1, 'singletonService');
+
+        expect(getProvider(holder).singletonService()).to.equal(obj1);
+        expect(getProvider(servicesContext).singletonService()).to.not.eq(obj1);
+    });
 });

@@ -1,4 +1,11 @@
-import {ENV_NAME_PREFIX, getServices} from "./ServicesContext.mjs";
+import {
+    ENV_NAME_PREFIX,
+    getEnvironment as _getEnvironment,
+    getFactories as _getFactories,
+    getConstants as _getConstants,
+    getProvider as _getProvider,
+    getServices
+} from "./ServicesContext.mjs";
 import {getEnvNameResolver} from "./services.mjs";
 import {
     ENV_DEVELOPMENT,
@@ -24,10 +31,6 @@ export function isStaging(services) {
 
 export function getEnvName(serviceAware, name) {
     return getEnvNameResolver(serviceAware).resolve(name);
-}
-
-export function getClasses(serviceAware) {
-    return getServices(serviceAware).classes;
 }
 
 export function setEnvPrefix(serviceAware, prefix) {
@@ -59,7 +62,7 @@ export function getEnvValues(serviceAware, ...names) {
 }
 
 export function getEnvironment(serviceAware) {
-    return getServices(serviceAware).env;
+    return _getEnvironment(serviceAware);
 }
 
 export function getEnv(serviceAware) {
@@ -67,12 +70,12 @@ export function getEnv(serviceAware) {
 }
 
 export function getConstants(serviceAware) {
-    return getServices(serviceAware).constants;
+    return _getConstants(serviceAware);
 }
 
 export function getFactories(serviceAware) {
     let services = getServices(serviceAware);
-    let factories = services.factories;
+    let factories = _getFactories(services);
     return Object.keys(factories)
         .reduce((acc, key) => {
             acc[key] = (...args) => factories[key](services, ...args);
@@ -81,5 +84,5 @@ export function getFactories(serviceAware) {
 }
 
 export function getProvider(serviceAware) {
-    return getServices(serviceAware).provider;
+    return _getProvider(serviceAware);
 }
