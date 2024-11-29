@@ -19,7 +19,7 @@ let factoriesSymbol = Symbol('services-factories');
 let classesSymbol = Symbol('services-classes');
 let constantsSymbol = Symbol('services-constants');
 let scopesSymbol = Symbol('services-scopes');
-let isServiceSymbol = Symbol('services-type');
+let isServiceSymbol = Symbol('is-services');
 
 export function getUuid(instance) {
     return instance[uuidSymbol];
