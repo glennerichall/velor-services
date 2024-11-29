@@ -1,5 +1,5 @@
 import {setupTestContext} from "velor-utils/test/setupTestContext.mjs";
-import {createAppServicesInstance, ENV_NAME_PREFIX, ServicesContext} from "../injection/ServicesContext.mjs";
+import {createAppServicesInstance, ENV_NAME_PREFIX} from "../injection/ServicesContext.mjs";
 import {
     getEnvironment,
     getEnvValue,
