@@ -109,7 +109,7 @@ export function getServices(serviceAware) {
     if (serviceAware !== undefined) {
         if (isService(serviceAware)) {
             return serviceAware;
-        } else if (hasServiceProperty(serviceAware)) {
+        } else if (hasServiceBound(serviceAware)) {
             return serviceAware[servicesSymbol];
         } else if (hasServiceProperty(serviceAware)) {
             return serviceAware.services;
