@@ -240,8 +240,8 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         let obj2 = {};
 
         getInstanceBinder(holder)
-            .setInstance(obj1, 'custom1')
-            .setInstance(obj2, 'custom2');
+            .setInstance('custom1', obj1)
+            .setInstance('custom2', obj2);
 
         expect(getProvider(holder).custom1()).to.equal(obj1);
         expect(getProvider(holder).custom2()).to.equal(obj2);
@@ -254,7 +254,7 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         };
 
         getServiceBinder(servicesContext).makeServiceAware(holder);
-        getInstanceBinder(holder).setInstance(obj1, 'singletonService');
+        getInstanceBinder(holder).setInstance('singletonService', obj1);
 
         let obj2 = getProvider(holder).singletonService();
         expect(obj2).to.equal(obj1);

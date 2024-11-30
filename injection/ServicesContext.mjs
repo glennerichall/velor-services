@@ -114,7 +114,7 @@ export function getServices(serviceAware) {
 
 export function getInstanceBinder(holder) {
     return {
-        setInstance(instance, key) {
+        setInstance(key, instance) {
             setHolderInstance(holder, key, instance);
             return this;
         }
