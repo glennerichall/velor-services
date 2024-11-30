@@ -1,8 +1,8 @@
 import {
-    cloneWithScope,
     createAppServicesInstance,
     getInstanceBinder,
     getServiceBinder,
+    getServiceBuilder,
     isServiceAware,
     SCOPE_PROTOTYPE,
     SCOPE_REQUEST,
@@ -67,7 +67,7 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         anInstance = {}
         // Initialize a new ServicesContext with factories and scopes
         servicesContext = createAppServicesInstance({
-            scopes: {
+            scopes: { // scopes can not be passed in constructor, this will be ignored
                 [SCOPE_SINGLETON]: {
                     anInstance
                 }
@@ -181,7 +181,7 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
                 .to.throw(Error, 'Provide a factory or a class for "undefinedService"');
         });
 
-        test('should throw an error if scope is not defined for a service', function () {
+        test('should not throw an error and auto create scopes for factories', function () {
             servicesContext = createAppServicesInstance({
                 factories: {
                     customService: {
@@ -191,7 +191,7 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
                 }
             });
 
-            expect(() => getProvider(servicesContext).customService()).to.throw(Error, /Define scope "undefinedScope"/);
+            expect(() => getProvider(servicesContext).customService()).to.not.throw(Error, /Define scope "undefinedScope"/);
         });
     });
 
@@ -216,7 +216,10 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
     });
 
     test('cloneWithScope clone should share parent scopes', function () {
-        let cloneServicesContext = cloneWithScope(servicesContext, SCOPE_REQUEST);
+        let cloneServicesContext = getServiceBuilder(servicesContext)
+            .clone()
+            .addScope(SCOPE_REQUEST)
+            .done();
 
         expect(getProvider(cloneServicesContext).singletonService()).to
             .equal(getProvider(servicesContext).singletonService());
@@ -244,15 +247,52 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
 
     test('provider should return service holder before service aware', function () {
         let holder = {};
-
-        let obj1 = {};
+        let obj1 = {
+            name: 'foobar'
+        };
 
         getServiceBinder(servicesContext).makeServiceAware(holder);
+        getInstanceBinder(holder).setInstance(obj1, 'singletonService');
 
-        getInstanceBinder(holder)
-            .setInstance(obj1, 'singletonService');
-
-        expect(getProvider(holder).singletonService()).to.equal(obj1);
+        let obj2 = getProvider(holder).singletonService();
+        expect(obj2).to.equal(obj1);
         expect(getProvider(servicesContext).singletonService()).to.not.eq(obj1);
+    });
+
+
+    test('provider should get scopes from instance then services', async () => {
+        let holder = {};
+        let obj1 = {};
+
+        expect(isServiceAware(holder)).to.be.false;
+        getServiceBinder(servicesContext).addScope(holder, "customScope");
+        expect(isServiceAware(holder)).to.be.true;
+
+        addFactory(servicesContext, 'obj', {
+            factory: () => obj1,
+            scope: 'customScope'
+        });
+
+        let instance1 = getProvider(holder).obj();
+        expect(instance1).to.eq(obj1);
+
+        let instance2 = getProvider(holder).obj();
+        expect(instance1).to.eq(instance2);
+
+        expect(()=> getProvider(servicesContext).obj()).to.throw(Error, /Define scope "customScope" in ServicesContext/);
+    });
+
+
+    test('service builder should permit to provide instances in instance scope', async () => {
+        let holder = {};
+        let obj1 = {};
+        let obj2 = {};
+
+        let instances = {
+            obj: obj1
+        };
+        getServiceBuilder(servicesContext).addScope("customScope", instances);
+        let instance1 = getProvider(servicesContext).obj();
+        expect(instance1).to.eq(obj1);
     });
 });

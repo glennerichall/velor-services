@@ -1,6 +1,7 @@
 import {isClass} from "./isClass.mjs";
 import {getGlobalContext} from "velor-utils/utils/global.mjs";
 import {mergeDefaultServicesOptions} from "./mergeDefaultServicesOptions.mjs";
+import {bindReplaceResult} from "velor-utils/utils/proxy.mjs";
 
 let __id__ = 0;
 
@@ -10,61 +11,56 @@ export const SCOPE_REQUEST = 'request';
 export const ENV_NAME_PREFIX = Symbol('env_name_prefix');
 
 let instanceUuid = 0;
-let uuidSymbol = Symbol('uuid');
-let keySymbol = Symbol('key');
-let servicesSymbol = Symbol('services');
-let holderSymbol = Symbol('services-holder');
-let envSymbol = Symbol('services-env');
-let factoriesSymbol = Symbol('services-factories');
-let classesSymbol = Symbol('services-classes');
-let constantsSymbol = Symbol('services-constants');
-let scopesSymbol = Symbol('services-scopes');
-let isServiceSymbol = Symbol('is-services');
+let kUuid = Symbol('uuid');
+let kKey = Symbol('key');
+let kServices = Symbol('services');
+let kHolder = Symbol('instance-holder');
+let kEnv = Symbol('services-env');
+let kFactories = Symbol('services-factories');
+let kClasses = Symbol('services-classes');
+let kConstants = Symbol('services-constants');
+let kScopes = Symbol('services-scopes');
+let kServicesFlag = Symbol('is-services');
+let kBuilder = Symbol('services-builder');
+
+// --------------------------------------------------------------------------------------------
+// Public functions
+// --------------------------------------------------------------------------------------------
 
 export function getUuid(instance) {
-    return instance[uuidSymbol];
+    return instance[kUuid];
 }
 
-export function getEnvironment(servicesAware) {
-    return getServices(servicesAware)[envSymbol];
+export function getEnvironment(servicesAware, scopeName = SCOPE_SINGLETON) {
+    let scope = getScope(servicesAware, scopeName);
+    return {...scope[kEnv]};
+}
+
+export function getConstants(servicesAware, scopeName = SCOPE_SINGLETON) {
+    let scope = getScope(servicesAware, scopeName);
+    return {...scope[kConstants]};
 }
 
 export function getFactories(servicesAware) {
-    return getServices(servicesAware)[factoriesSymbol];
-}
-
-export function getConstants(servicesAware) {
-    return getServices(servicesAware)[constantsSymbol];
+    return {...getServices(servicesAware)[kFactories]};
 }
 
 export function getProvider(servicesAware) {
     return createServiceProvider(servicesAware);
 }
 
-function isService(serviceAware) {
-    return !!serviceAware && serviceAware[isServiceSymbol];
-}
-
-function hasServiceBound(serviceAware) {
-    return !!serviceAware && isService(serviceAware[servicesSymbol]);
-}
-
-function hasServiceProperty(serviceAware) {
-    return isService(serviceAware?.services);
-}
-
 export function isServiceAware(serviceAware) {
-    return isService(serviceAware) ||
-        hasServiceBound(serviceAware) ||
-        hasServiceProperty(serviceAware);
+    return !!(getServiceDirect(serviceAware) ||
+        getServiceBound(serviceAware) ||
+        getServiceProperty(serviceAware));
 }
 
-export function createAppServicesInstance(options, type = 'none') {
+export function createAppServicesInstance(options = {}, type = 'none') {
     options = mergeDefaultServicesOptions(options ?? {});
+
     let {
         env = {},
         factories = {},
-
         constants = {},
         id = 'context',
         classes = {},
@@ -72,16 +68,12 @@ export function createAppServicesInstance(options, type = 'none') {
 
     id = id + "::" + ++__id__;
     constants = {...constants};
-    let scopes = {
-        [SCOPE_SINGLETON]: {},
-        [SCOPE_REQUEST]: {}
-    };
     env = {...env};
     factories = {...factories};
     classes = {...classes};
 
-    return {
-        get [isServiceSymbol]() {
+    let services = {
+        get [kServicesFlag]() {
             return true;
         },
         get id() {
@@ -90,119 +82,77 @@ export function createAppServicesInstance(options, type = 'none') {
         get type() {
             return type;
         },
-        [scopesSymbol]: scopes,
-        [constantsSymbol]: constants,
-        [classesSymbol]: classes,
-        [envSymbol]: env,
-        [factoriesSymbol]: factories
+        [kConstants]: constants,
+        [kClasses]: classes,
+        [kEnv]: env,
+        [kFactories]: factories
     };
-}
 
-function getServicesOrNot(servicesAware) {
-    if (isServiceAware(servicesAware)) {
-        return getServices(servicesAware);
+    let scopeNames = [SCOPE_SINGLETON, ...new Set(Object.keys(factories)
+        .map(key => findScopeNameHintForKey(services, key)))];
+
+    for (let name of scopeNames) {
+        createScope(services, name);
     }
-    return null;
+
+    services = new ServiceContext(services);
+
+    return services[kBuilder]
+        .addFactories(factories)
+        .addClasses(classes)
+        .addEnvs(env)
+        .addConstants(constants)
+        .done();
 }
 
 export function getServices(serviceAware) {
     if (serviceAware !== undefined) {
-        if (isService(serviceAware)) {
-            return serviceAware;
-        } else if (hasServiceBound(serviceAware)) {
-            return serviceAware[servicesSymbol];
-        } else if (hasServiceProperty(serviceAware)) {
-            return serviceAware.services;
-        } else {
+        let services = getServiceDirect(serviceAware) ??
+            getServiceBound(serviceAware) ??
+            getServiceProperty(serviceAware);
+
+        if (!services) {
             throw new Error(`serviceAware must be a ServicesContext or an object aware of services`);
         }
+        return services;
     } else {
         return getGlobalServices();
     }
 }
 
-export function clearScope(serviceAware, scope) {
-    if (scope === SCOPE_SINGLETON) {
-        throw new Error('Clearing singleton scope is not allowed');
-    }
-    let scopes = getServices(serviceAware)[scopesSymbol];
-    scopes[scope] = {};
-}
-
-export function cloneWithScope(services, scope) {
-    let scopeHolder = {};
-    return {
-        get [isServiceSymbol]() {
-            return true;
-        },
-
-        get [scopesSymbol]() {
-            const scopes = services[scopesSymbol];
-            return {
-                ...scopes,
-                [scope]: scopeHolder
-            };
-        },
-
-        get [constantsSymbol]() {
-            return services[constantsSymbol];
-        },
-
-        get [classesSymbol]() {
-            return services[classesSymbol];
-        },
-
-        get [envSymbol]() {
-            return services[envSymbol];
-        },
-
-        get [factoriesSymbol]() {
-            return services[factoriesSymbol];
-        }
-    };
-}
-
-function setInstance(serviceHolder, key, instance) {
-    if (!serviceHolder[holderSymbol]) {
-        serviceHolder[holderSymbol] = {};
-    }
-    serviceHolder[holderSymbol][key] = instance;
-}
-
-function getInstance(serviceHolder, key) {
-    let holder = serviceHolder[holderSymbol];
-    if (holder) {
-        return holder[key];
-    }
-    return undefined;
-}
-
 export function getInstanceBinder(holder) {
     return {
         setInstance(instance, key) {
-            setInstance(holder, key, instance);
+            setHolderInstance(holder, key, instance);
             return this;
         }
     };
 }
 
+export function getServiceBuilder(serviceAware) {
+    let services = getServices(serviceAware);
+    return services instanceof ServiceContext ?
+        services[kBuilder] :
+        createServiceBuilder(serviceAware);
+}
 
 export function getServiceBinder(serviceAware) {
     let services = getServices(serviceAware);
+
     return {
         makeServiceAware(instance) {
-            instance[servicesSymbol] = services;
-            return instance;
+            instance[kServices] = services;
+            return this;
         },
         autoWire(instance) {
-            instance = this.makeServiceAware(instance);
+            this.makeServiceAware(instance);
             if (typeof instance.initialize === 'function') {
                 let result = instance.initialize();
                 if (result instanceof Promise) {
                     result.catch(e => console.error(e))
                 }
             }
-            return instance;
+            return this;
         },
         createInstance(classOrKey, ...args) {
             let instance;
@@ -210,7 +160,7 @@ export function getServiceBinder(serviceAware) {
                 const factory = getFactoryForKey(services, classOrKey);
                 if (typeof factory === "function") {
                     instance = factory(services, ...args);
-                    instance[keySymbol] = classOrKey;
+                    instance[kKey] = classOrKey;
                 } else {
                     throw new Error(`Provide a factory function for key ${classOrKey}`);
                 }
@@ -219,8 +169,9 @@ export function getServiceBinder(serviceAware) {
             } else {
                 throw new Error("Provide a class or an instance key");
             }
-            instance[uuidSymbol] = ++instanceUuid;
-            return this.autoWire(instance);
+            instance[kUuid] = ++instanceUuid;
+            this.autoWire(instance);
+            return instance;
         },
         clone(instance, ...args) {
             return this.createInstance(instance.constructor, ...args);
@@ -228,12 +179,212 @@ export function getServiceBinder(serviceAware) {
     }
 }
 
+// --------------------------------------------------------------------------------------------
+// Private functions
+// --------------------------------------------------------------------------------------------
+
+export function getClasses(servicesAware) {
+    return {...getServices(servicesAware)[kClasses]};
+}
+
+function createServiceBuilder(serviceAware) {
+    let services = getServices(serviceAware);
+
+    return {
+        done() {
+            return services;
+        },
+        addScope(name, instances = {}) {
+            createScope(services, name, instances);
+            return this;
+        },
+        addScopes(scopes) {
+            for (let key in scopes) {
+                this.addScope(key, scopes[key]);
+            }
+            return this;
+        },
+        clearScope(scopeName) {
+            if (scopeName === SCOPE_SINGLETON) {
+                throw new Error('Clearing singleton scope is not allowed');
+            }
+            let scope = getScope(services, scopeName);
+            scope.instances = {};
+        },
+        addFactory(name, definition) {
+            services[kFactories][name] = definition;
+            return this;
+        },
+        addFactories(factories) {
+            for (let key in factories) {
+                this.addFactory(key, factories[key]);
+            }
+            return this;
+        },
+        addConstant(name, value) {
+            services[kConstants][name] = value;
+            return this;
+        },
+        addConstants(constants) {
+            for (let key in constants) {
+                this.addConstant(key, constants[key]);
+            }
+            return this;
+        },
+        addClass(name, clazz) {
+            services[kClasses][name] = clazz;
+            return this;
+        },
+        addClasses(classes) {
+            for (let key in classes) {
+                this.addClass(key, classes[key]);
+            }
+            return this;
+        },
+        addEnv(name, value) {
+            services[kEnv][name] = value;
+            return this;
+        },
+        addEnvs(env) {
+            for (let key in env) {
+                this.addEnv(key, env[key]);
+            }
+            return this;
+        },
+        clone() {
+            let proxy = new ServiceContext(services);
+            return proxy[kBuilder];
+        }
+    }
+}
+
+class ServiceContext {
+    #parent;
+    #localServices = {
+        get [kServicesFlag]() {
+            return true;
+        },
+        [kClasses]: {},
+        [kEnv]: {},
+        [kConstants]: {},
+        [kFactories]: {},
+        [kScopes]: {},
+    };
+
+    constructor(parent) {
+        this.#parent = parent;
+    }
+
+    get [kServicesFlag]() {
+        return true;
+    }
+
+    get [kBuilder]() {
+        let builder = createServiceBuilder(this.#localServices);
+        bindReplaceResult(builder, 'done', () => {
+            return this;
+        });
+        return builder;
+    }
+
+    get [kClasses]() {
+        return {
+            ...this.#parent[kClasses],
+            ...this.#localServices[kClasses]
+        };
+    }
+
+    get [kScopes]() {
+        return {
+            ...this.#parent[kScopes],
+            ...this.#localServices[kScopes]
+        };
+    }
+
+    get [kConstants]() {
+        return {
+            ...this.#parent[kConstants],
+            ...this.#localServices[kConstants]
+        };
+    }
+
+    get [kFactories]() {
+        return {
+            ...this.#parent[kFactories],
+            ...this.#localServices[kFactories]
+        };
+    }
+
+    get [kEnv]() {
+        return {
+            ...this.#parent[kEnv],
+            ...this.#localServices[kEnv]
+        };
+    }
+}
+
+function getServiceDirect(serviceAware) {
+    return serviceAware && serviceAware[kServicesFlag] && serviceAware;
+}
+
+function getServiceBound(serviceAware) {
+    return !!serviceAware && getServiceDirect(serviceAware[kServices]);
+}
+
+function getServiceProperty(serviceAware) {
+    return getServiceDirect(serviceAware?.services);
+}
+
+function createScope(tiedTo, name, instances = {}) {
+
+    if (tiedTo && !tiedTo[kScopes]) {
+        tiedTo[kScopes] = {};
+    }
+
+    instances = {...instances}; // ensure holder is cloned so it is immutable outside
+    let scope = {
+        name,
+        instances,
+        tiedTo
+    };
+
+    if (tiedTo && !tiedTo[kScopes][name]) {
+        tiedTo[kScopes][name] = scope;
+    }
+
+    return scope;
+}
+
+function getServicesNoThrow(servicesAware) {
+    if (isServiceAware(servicesAware)) {
+        return getServices(servicesAware);
+    }
+    return null;
+}
+
+function setHolderInstance(serviceHolder, key, instance) {
+    if (!serviceHolder) {
+        return;
+    }
+    if (!serviceHolder[kHolder]) {
+        serviceHolder[kHolder] = {};
+    }
+    serviceHolder[kHolder][key] = instance;
+}
+
+function getHolderInstance(serviceHolder, key) {
+    if (!serviceHolder || !serviceHolder[kHolder]) {
+        return;
+    }
+    return serviceHolder[kHolder][key];
+}
+
 function isInstanceKey(key) {
     return typeof key === 'string';
 }
 
 function getGlobalServices(type) {
-    let contexts = getGlobalContext()[servicesSymbol];
+    let contexts = getGlobalContext()[kServices];
     if (contexts) {
         if (type !== undefined) {
             return contexts[type];
@@ -246,37 +397,49 @@ function getGlobalServices(type) {
     }
 }
 
+function getScopes(serviceAware) {
+    return getServices(serviceAware)[kScopes];
+}
+
+function getScope(services, name) {
+    return getScopes(services)[name];
+}
+
 function createServiceProvider(serviceAware) {
     return new Proxy({}, {
         get(target, key, receiver) {
             return (...args) => {
 
-                // if the object holds an instance of the required key
-                // then provide it
-                let instance = getInstance(serviceAware, key);
-                if (instance !== undefined) {
-                    return instance;
-                }
+                // local holder instances are prioritized
+                let instance = getHolderInstance(serviceAware, key);
+                if (instance) return instance;
 
                 let services = getServices(serviceAware);
 
                 // if not find the scope of the key
-                const scope = getScopeForKey(services, key);
+                const scopeNameHint = findScopeNameHintForKey(services, key);
 
                 // ensure the scope exists
-                let scopes = services[scopesSymbol];
-                if (scope !== SCOPE_PROTOTYPE && !scopes[scope]) {
-                    throw new Error(`Define scope "${scope}" in ServicesContext`);
+                let scope = getScope(serviceAware, scopeNameHint);
+
+                if (scopeNameHint === SCOPE_PROTOTYPE) {
+                    // create a volatile scope for prototypes
+                    scope = createScope(null, SCOPE_PROTOTYPE);
                 }
 
-                // find the instance in any of the existing scopes
-                for (let s in scopes) {
-                    instance = scopes[s][key];
+                if (!scope) {
+                    throw new Error(`Define scope "${scopeNameHint}" in ServicesContext`);
+                }
+
+                // find the instance in scopes
+                let scopes = getScopes(services);
+                for (let scopeName in scopes) {
+                    let scope = scopes[scopeName];
+                    instance = scope.instances[key];
                     if (instance) {
-                        // this should not occur, but if it is not already a service aware
-                        // make it.
+                        // this should not occur, but if it is not already a service aware make it.
                         if (!isServiceAware(instance)) {
-                            instance = getServiceBinder(services).makeServiceAware(instance);
+                            getServiceBinder(services).makeServiceAware(instance);
                         }
                         break;
                     }
@@ -285,12 +448,10 @@ function createServiceProvider(serviceAware) {
                 // no instance found in scopes, just create a new instance
                 if (instance === undefined) {
                     instance = getServiceBinder(services).createInstance(key, ...args);
-                    // instance = services.onCreateInstance(instance, key, services, receiver);
-
                     // for prototype scope, a new instance is created on each call
                     // consequently we do not save the instance in scopes
-                    if (scope !== SCOPE_PROTOTYPE) {
-                        scopes[scope][key] = instance;
+                    if (scopeNameHint !== SCOPE_PROTOTYPE) {
+                        scope.instances[key] = instance;
                     }
                 }
 
@@ -300,8 +461,8 @@ function createServiceProvider(serviceAware) {
     });
 }
 
-function getScopeForKey(services, key) {
-    let definition = services[factoriesSymbol][key];
+function findScopeNameHintForKey(services, key) {
+    let definition = getFactories(services)[key];
     let scope;
     if (typeof definition === 'object') {
         scope = definition.scope;
@@ -310,8 +471,8 @@ function getScopeForKey(services, key) {
 }
 
 function getFactoryForKey(services, key) {
-    let definition = services[factoriesSymbol][key];
-    let clazz = services[classesSymbol][key];
+    let definition = getFactories(services)[key];
+    let clazz = getClasses(services)[key];
     let factory;
     if (clazz && definition) {
         throw new Error(`Provide a class or a factory for "${key}" not both`);
