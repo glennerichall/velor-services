@@ -24,7 +24,7 @@ export function getLogger(servicesAware) {
         return servicesAware[loggerSymbol];
     } else if (process.env.ZUPFE_LOG_LEVEL) {
         return winston.createLogger({
-            level: process.env.ZUPFE_LOG_LEVEL,
+            level: process.env.LOG_LEVEL,
             transports: [new winston.transports.Console()],
             format: winston.format.simple(),
         })
