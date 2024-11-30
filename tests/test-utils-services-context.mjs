@@ -210,23 +210,25 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
 
 
     test('cloneWithScope should clone servicesContext with a new scope', function () {
-        let cloneServicesContext = cloneWithScope(servicesContext, SCOPE_REQUEST);
+        let cloneServicesContext = getServiceBuilder(servicesContext)
+            .clone().addScope(SCOPE_REQUEST).done();
         expect(cloneServicesContext).to.not.equal(servicesContext);
         expect(isServiceAware(cloneServicesContext)).to.be.true;
     });
 
     test('cloneWithScope clone should share parent scopes', function () {
         let cloneServicesContext = getServiceBuilder(servicesContext)
-            .clone()
-            .addScope(SCOPE_REQUEST)
-            .done();
+            .clone().addScope(SCOPE_REQUEST).done();
 
         expect(getProvider(cloneServicesContext).singletonService()).to
             .equal(getProvider(servicesContext).singletonService());
     });
 
     test('cloneWithScope clone not should share new scope', function () {
-        let cloneServicesContext = cloneWithScope(servicesContext, SCOPE_REQUEST);
+        let cloneServicesContext = getServiceBuilder(servicesContext)
+            .clone()
+            .addScope(SCOPE_REQUEST)
+            .done();
 
         expect(getProvider(cloneServicesContext).requestService()).to.not
             .equal(getProvider(servicesContext).requestService());
@@ -268,7 +270,7 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         getServiceBinder(servicesContext).addScope(holder, "customScope");
         expect(isServiceAware(holder)).to.be.true;
 
-        addFactory(servicesContext, 'obj', {
+        getServiceBuilder(servicesContext).addFactory('obj', {
             factory: () => obj1,
             scope: 'customScope'
         });
@@ -279,7 +281,27 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         let instance2 = getProvider(holder).obj();
         expect(instance1).to.eq(instance2);
 
-        expect(()=> getProvider(servicesContext).obj()).to.throw(Error, /Define scope "customScope" in ServicesContext/);
+        expect(() => getProvider(servicesContext).obj()).to.throw(Error, /Define scope "customScope" in ServicesContext/);
+    });
+
+    test('provider should not fail for no scope in holder', async () => {
+        let holder = {};
+        let obj1 = {};
+
+        // we omit to add a scope to holder
+        // expect(isServiceAware(holder)).to.be.false;
+        // getServiceBinder(servicesContext).addScope(holder, "customScope");
+        // expect(isServiceAware(holder)).to.be.true;
+
+        getServiceBinder(servicesContext).makeServiceAware(holder);
+
+        getServiceBuilder(servicesContext)
+            .addFactory('obj', {
+                factory: () => obj1,
+                scope: 'customScope'
+            });
+
+        expect(() => getProvider(holder).obj()).to.throw(Error, /Define scope "customScope" in ServicesContext/);
     });
 
 

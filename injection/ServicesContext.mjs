@@ -31,18 +31,16 @@ export function getUuid(instance) {
     return instance[kUuid];
 }
 
-export function getEnvironment(servicesAware, scopeName = SCOPE_SINGLETON) {
-    let scope = getScope(servicesAware, scopeName);
-    return {...scope[kEnv]};
+export function getEnvironment(servicesAware) {
+    return getServices(servicesAware)[kEnv];
 }
 
-export function getConstants(servicesAware, scopeName = SCOPE_SINGLETON) {
-    let scope = getScope(servicesAware, scopeName);
-    return {...scope[kConstants]};
+export function getConstants(servicesAware) {
+    return getServices(servicesAware)[kConstants];
 }
 
 export function getFactories(servicesAware) {
-    return {...getServices(servicesAware)[kFactories]};
+    return getServices(servicesAware)[kFactories];
 }
 
 export function getProvider(servicesAware) {
@@ -55,7 +53,7 @@ export function isServiceAware(serviceAware) {
         getServiceProperty(serviceAware));
 }
 
-export function createAppServicesInstance(options = {}, type = 'none') {
+export function createAppServicesInstance(options = {}) {
     options = mergeDefaultServicesOptions(options ?? {});
 
     let {
@@ -64,6 +62,7 @@ export function createAppServicesInstance(options = {}, type = 'none') {
         constants = {},
         id = 'context',
         classes = {},
+        type = 'none'
     } = options;
 
     id = id + "::" + ++__id__;
@@ -95,14 +94,7 @@ export function createAppServicesInstance(options = {}, type = 'none') {
         createScope(services, name);
     }
 
-    services = new ServiceContext(services);
-
-    return services[kBuilder]
-        .addFactories(factories)
-        .addClasses(classes)
-        .addEnvs(env)
-        .addConstants(constants)
-        .done();
+    return new ServiceContext(services);
 }
 
 export function getServices(serviceAware) {
@@ -131,9 +123,16 @@ export function getInstanceBinder(holder) {
 
 export function getServiceBuilder(serviceAware) {
     let services = getServices(serviceAware);
-    return services instanceof ServiceContext ?
+    let builder = services instanceof ServiceContext ?
         services[kBuilder] :
         createServiceBuilder(serviceAware);
+
+    builder.clone = () => {
+        let proxy = new ServiceContext(services);
+        return proxy[kBuilder];
+    };
+
+    return builder;
 }
 
 export function getServiceBinder(serviceAware) {
@@ -172,6 +171,13 @@ export function getServiceBinder(serviceAware) {
             instance[kUuid] = ++instanceUuid;
             this.autoWire(instance);
             return instance;
+        },
+        addScope(instance, scopeName, instances = {}) {
+            if (!isServiceAware(instance)) {
+                this.autoWire(instance);
+            }
+            createScope(instance, scopeName, instances);
+            return this;
         },
         clone(instance, ...args) {
             return this.createInstance(instance.constructor, ...args);
@@ -251,10 +257,6 @@ function createServiceBuilder(serviceAware) {
             }
             return this;
         },
-        clone() {
-            let proxy = new ServiceContext(services);
-            return proxy[kBuilder];
-        }
     }
 }
 
@@ -398,7 +400,12 @@ function getGlobalServices(type) {
 }
 
 function getScopes(serviceAware) {
-    return getServices(serviceAware)[kScopes];
+    let servicesScopes = getServices(serviceAware)[kScopes];
+    let ownScopes = serviceAware[kScopes] ?? {};
+    return {
+        ...servicesScopes,
+        ...ownScopes
+    };
 }
 
 function getScope(services, name) {
