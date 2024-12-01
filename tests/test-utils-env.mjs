@@ -3,9 +3,11 @@ import {createAppServicesInstance, ENV_NAME_PREFIX} from "../injection/ServicesC
 import {
     getEnvironment,
     getEnvValue,
+    getEnvValueArray,
     getEnvValueIndirect,
     getEnvValues,
-    getNodeEnv, isProduction
+    getNodeEnv,
+    isProduction
 } from "../injection/baseServices.mjs";
 import {ENV_TEST} from "velor-utils/env.mjs";
 
@@ -24,6 +26,7 @@ test.describe('environment', () => {
                 VAR_A: 'valueA',
                 VAR_B: 'valueB',
                 VAR_B_VAR: 'VAR_B',
+                VAR_ARR: 'A;B;C;D;',
                 NODE_ENV: ENV_TEST
             };
             services = createAppServicesInstance({
@@ -53,6 +56,10 @@ test.describe('environment', () => {
 
         test('should get variable indirect', () => {
             expect(getEnvValueIndirect(services, 'VAR_B_VAR')).to.eq('valueB');
+        })
+
+        test('should get variable array', () => {
+            expect(getEnvValueArray(services, 'VAR_ARR')).to.deep.eq(['A','B','C','D', '']);
         })
     })
 

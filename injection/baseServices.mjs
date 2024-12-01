@@ -1,8 +1,8 @@
 import {
     ENV_NAME_PREFIX,
+    getConstants as _getConstants,
     getEnvironment as _getEnvironment,
     getFactories as _getFactories,
-    getConstants as _getConstants,
     getProvider as _getProvider,
     getServices
 } from "./ServicesContext.mjs";
@@ -43,6 +43,18 @@ export function getEnvValue(serviceAware, name, defaultValue) {
     if (value === undefined) {
         value = defaultValue;
     }
+    return value;
+}
+
+export function getEnvValueArray(serviceAware, name, separator = ";") {
+    let fullName = getEnvName(serviceAware, name);
+    let value = getEnvironment(serviceAware)[fullName];
+    if (value === undefined) {
+        value = "";
+    }
+    // user may want to have empty values, so we will not ignore empty
+    // values.
+    value = value.split(separator);
     return value;
 }
 
