@@ -9,7 +9,10 @@ import {
     SCOPE_SINGLETON,
 } from "../injection/ServicesContext.mjs";
 import sinon from "sinon";
-import {getProvider} from "../injection/baseServices.mjs";
+import {
+    getEnvValue,
+    getProvider
+} from "../injection/baseServices.mjs";
 
 import {setupTestContext} from "velor-utils/test/setupTestContext.mjs";
 
@@ -208,7 +211,6 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         expect(instance.arg2).to.equal('b');
     })
 
-
     test('cloneWithScope should clone servicesContext with a new scope', function () {
         let cloneServicesContext = getServiceBuilder(servicesContext)
             .clone().addScope(SCOPE_REQUEST).done();
@@ -261,7 +263,6 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         expect(getProvider(servicesContext).singletonService()).to.not.eq(obj1);
     });
 
-
     test('provider should get scopes from instance then services', async () => {
         let holder = {};
         let obj1 = {};
@@ -304,7 +305,6 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         expect(() => getProvider(holder).obj()).to.throw(Error, /Define scope "customScope" in ServicesContext/);
     });
 
-
     test('service builder should permit to provide instances in instance scope', async () => {
         let holder = {};
         let obj1 = {};
@@ -317,4 +317,25 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         let instance1 = getProvider(servicesContext).obj();
         expect(instance1).to.eq(obj1);
     });
+
+    test('should chain service inheritance', async()=> {
+
+        getServiceBuilder(servicesContext)
+            .addEnv("env1", 10)
+            .addEnv("env2", 20)
+            .done();
+
+        expect(getEnvValue(servicesContext, "env1")).to.equal(10);
+        expect(getEnvValue(servicesContext, "env2")).to.equal(20);
+
+        let clone = getServiceBuilder(servicesContext)
+            .clone()
+            .addEnv("env2", 30)
+            .addEnv("env3", 40)
+            .done();
+
+        expect(getEnvValue(clone, "env1")).to.equal(10);
+        expect(getEnvValue(clone, "env2")).to.equal(30);
+        expect(getEnvValue(clone, "env3")).to.equal(40);
+    })
 });

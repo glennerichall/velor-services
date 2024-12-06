@@ -10,7 +10,8 @@ import {getEnvNameResolver} from "./services.mjs";
 import {
     ENV_DEVELOPMENT,
     ENV_PRODUCTION,
-    ENV_STAGING
+    ENV_STAGING,
+    ENV_TEST
 } from "velor-utils/env.mjs";
 
 export function getNodeEnv(services) {
@@ -23,6 +24,10 @@ export function isProduction(services) {
 
 export function isDevelopment(services) {
     return getNodeEnv(services) === ENV_DEVELOPMENT;
+}
+
+export function isTest(services) {
+    return getNodeEnv(services) === ENV_TEST;
 }
 
 export function isStaging(services) {
