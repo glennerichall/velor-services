@@ -1,6 +1,8 @@
 import {getProvider} from "./baseServices.mjs";
 import {
+    s_emitter,
     s_envNameResolver,
+    s_eventQueue,
     s_logger
 } from "./serviceKeys.mjs";
 import {isServiceAware} from "../../injection/ServicesContext.mjs";
@@ -41,4 +43,12 @@ export function getLogger(servicesAware) {
     }
 
     return logger;
+}
+
+export function getEmitter(services) {
+    return getProvider(services)[s_emitter]();
+}
+
+export function getEventQueue(services) {
+    return getProvider(services)[s_eventQueue]();
 }
