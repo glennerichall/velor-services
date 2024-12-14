@@ -1,4 +1,4 @@
-import {baseFactories} from "./baseFactories.mjs";
+import {factories as defaultFactories} from "./factories.mjs";
 
 export function mergeDefaultServicesOptions(options = {}) {
     let {
@@ -9,7 +9,7 @@ export function mergeDefaultServicesOptions(options = {}) {
         ...options,
 
         factories: {
-            ...baseFactories,
+            ...defaultFactories,
             ...factories,
         },
     }

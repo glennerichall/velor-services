@@ -5,7 +5,7 @@ import {
     getFactories as _getFactories,
     getProvider as _getProvider,
     getServices
-} from "./ServicesContext.mjs";
+} from "../../injection/ServicesContext.mjs";
 import {getEnvNameResolver} from "./services.mjs";
 import {
     ENV_DEVELOPMENT,

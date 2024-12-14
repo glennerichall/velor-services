@@ -1,5 +1,5 @@
-import {ENV_NAME_PREFIX} from "./ServicesContext.mjs";
-import {getConstants} from "./baseServices.mjs";
+import {ENV_NAME_PREFIX} from "../../injection/ServicesContext.mjs";
+import {getConstants} from "../services/baseServices.mjs";
 
 export function createEnvNameResolver(services) {
     let constants = getConstants(services);

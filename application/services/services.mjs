@@ -3,7 +3,7 @@ import {
     s_envNameResolver,
     s_logger
 } from "./serviceKeys.mjs";
-import {isServiceAware} from "./ServicesContext.mjs";
+import {isServiceAware} from "../../injection/ServicesContext.mjs";
 import winston from "winston";
 import {noOpLogger} from "velor-utils/utils/noOpLogger.mjs";
 

@@ -8,7 +8,7 @@ import {
     getEnvValues,
     getNodeEnv,
     isProduction
-} from "../injection/baseServices.mjs";
+} from "../application/services/baseServices.mjs";
 import {ENV_TEST} from "velor-utils/env.mjs";
 
 const {

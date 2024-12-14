@@ -12,7 +12,7 @@ import sinon from "sinon";
 import {
     getEnvValue,
     getProvider
-} from "../injection/baseServices.mjs";
+} from "../application/services/baseServices.mjs";
 
 import {setupTestContext} from "velor-utils/test/setupTestContext.mjs";
 

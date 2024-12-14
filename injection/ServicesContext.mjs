@@ -1,6 +1,6 @@
 import {isClass} from "./isClass.mjs";
 import {getGlobalContext} from "velor-utils/utils/global.mjs";
-import {mergeDefaultServicesOptions} from "./mergeDefaultServicesOptions.mjs";
+import {mergeDefaultServicesOptions} from "../application/services/mergeDefaultServicesOptions.mjs";
 import {bindReplaceResult} from "velor-utils/utils/proxy.mjs";
 
 let __id__ = 0;

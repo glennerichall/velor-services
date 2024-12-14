@@ -1,6 +1,6 @@
 import {isClass} from "../injection/isClass.mjs";
 import {setupTestContext} from "velor-utils/test/setupTestContext.mjs";
-import {createInstance} from "../injection/createInstance.mjs";
+import {createInstance} from "../application/factories/createInstance.mjs";
 
 const {
     expect,
