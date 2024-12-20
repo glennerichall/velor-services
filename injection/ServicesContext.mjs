@@ -423,7 +423,11 @@ function createServiceProvider(serviceAware) {
 
                 let services = getServices(serviceAware);
 
-                // if not find the scope of the key
+                // second shot, maybe we set an instance directly on services.
+                instance = getHolderInstance(services, key);
+                if (instance) return instance;
+
+                // if not, find the scope of the key
                 const scopeNameHint = findScopeNameHintForKey(services, key);
 
                 // ensure the scope exists

@@ -263,6 +263,19 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         expect(getProvider(servicesContext).singletonService()).to.not.eq(obj1);
     });
 
+
+    test('instance binder may shadow values directly on services', async () => {
+        let obj1 = {
+            name: 'foobar'
+        };
+        let holder = {};
+        getServiceBinder(servicesContext).makeServiceAware(holder);
+        getInstanceBinder(servicesContext).setInstance('singletonService', obj1);
+        let obj2 = getProvider(holder).singletonService();
+        expect(obj2).to.equal(obj1);
+        expect(getProvider(servicesContext).singletonService()).to.eq(obj1);
+    });
+
     test('provider should get scopes from instance then services', async () => {
         let holder = {};
         let obj1 = {};
@@ -284,6 +297,7 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
 
         expect(() => getProvider(servicesContext).obj()).to.throw(Error, /Define scope "customScope" in ServicesContext/);
     });
+
 
     test('provider should not fail for no scope in holder', async () => {
         let holder = {};
