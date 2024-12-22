@@ -121,6 +121,10 @@ export function getInstanceBinder(holder) {
         getInstances() {
             return getHolderInstances(holder);
         },
+        getInstance(key) {
+            let instances = this.getInstances();
+            return instances[key];
+        },
         setInstancesTo(other) {
             let instances = this.getInstances();
             for (let key in instances) {

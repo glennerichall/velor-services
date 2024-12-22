@@ -5,7 +5,10 @@ import {
     s_eventQueue,
     s_logger
 } from "./serviceKeys.mjs";
-import {isServiceAware} from "../../injection/ServicesContext.mjs";
+import {
+    getInstanceBinder,
+    isServiceAware
+} from "../../injection/ServicesContext.mjs";
 import winston from "winston";
 import {noOpLogger} from "velor-utils/utils/noOpLogger.mjs";
 
@@ -13,20 +16,21 @@ export function getEnvNameResolver(serviceAware) {
     return getProvider(serviceAware)[s_envNameResolver]();
 }
 
-const loggerSymbol = Symbol("logger");
 
 export function setLogger(holder, logger) {
-    holder[loggerSymbol] = logger;
+    getInstanceBinder(holder).setInstance(s_logger, logger);
 }
 
 export function getLogger(servicesAware) {
-    let logger;
-    if (servicesAware[loggerSymbol] !== undefined) {
-        logger = servicesAware[loggerSymbol];
-    } else if (isServiceAware(servicesAware)) {
-        try {
-            logger = getProvider(servicesAware)[s_logger]();
-        } catch (e) {
+    let logger = getInstanceBinder(servicesAware)
+        .getInstance(s_logger);
+
+    if (!logger) {
+        if (isServiceAware(servicesAware)) {
+            try {
+                logger = getProvider(servicesAware)[s_logger]();
+            } catch (e) {
+            }
         }
     }
 

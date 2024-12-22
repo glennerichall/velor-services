@@ -15,6 +15,8 @@ import {
 } from "../application/services/baseServices.mjs";
 
 import {setupTestContext} from "velor-utils/test/setupTestContext.mjs";
+import {s_logger} from "../application/services/serviceKeys.mjs";
+import {getLogger} from "../application/services/services.mjs";
 
 // Example classes for testing
 class SingletonClass {
@@ -352,7 +354,7 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         expect(instance1).to.eq(obj1);
     });
 
-    test('should chain service inheritance', async()=> {
+    test('should chain service inheritance', async () => {
 
         getServiceBuilder(servicesContext)
             .addEnv("env1", 10)
@@ -371,5 +373,15 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         expect(getEnvValue(clone, "env1")).to.equal(10);
         expect(getEnvValue(clone, "env2")).to.equal(30);
         expect(getEnvValue(clone, "env3")).to.equal(40);
+    })
+
+    test('should get logger from binded instance', async () => {
+        let holder = {};
+        let logger = {
+            debug: sinon.stub()
+        };
+        getInstanceBinder(holder).setInstance(s_logger, logger);
+
+        expect(getLogger(holder)).to.eq(logger);
     })
 });
