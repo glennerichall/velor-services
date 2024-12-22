@@ -276,6 +276,26 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         expect(getProvider(servicesContext).singletonService()).to.eq(obj1);
     });
 
+    test('services clone must convey all installed instances', async () => {
+        let obj1 = {
+            name: 'foobar'
+        };
+        let holder = {};
+
+        getInstanceBinder(servicesContext).setInstance('singletonService', obj1);
+        let clone = getServiceBuilder(servicesContext)
+            .clone()
+            .done();
+
+        expect(getProvider(clone).singletonService()).to.eq(obj1);
+
+        getServiceBinder(clone).makeServiceAware(holder);
+
+        let obj2 = getProvider(holder).singletonService();
+        expect(obj2).to.equal(obj1);
+
+    });
+
     test('provider should get scopes from instance then services', async () => {
         let holder = {};
         let obj1 = {};

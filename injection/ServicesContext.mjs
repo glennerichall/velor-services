@@ -117,6 +117,16 @@ export function getInstanceBinder(holder) {
         setInstance(key, instance) {
             setHolderInstance(holder, key, instance);
             return this;
+        },
+        getInstances() {
+            return getHolderInstances(holder);
+        },
+        setInstancesTo(other) {
+            let instances = this.getInstances();
+            for (let key in instances) {
+                setHolderInstance(other, key, instances[key]);
+            }
+            return this;
         }
     };
 }
@@ -129,6 +139,7 @@ export function getServiceBuilder(serviceAware) {
 
     builder.clone = () => {
         let proxy = new ServiceContext(services);
+        getInstanceBinder(services).setInstancesTo(proxy)
         return proxy[kBuilder];
     };
 
@@ -364,21 +375,27 @@ function getServicesNoThrow(servicesAware) {
     return null;
 }
 
-function setHolderInstance(serviceHolder, key, instance) {
-    if (!serviceHolder) {
+function setHolderInstance(holder, key, instance) {
+    if (!holder) {
         return;
     }
-    if (!serviceHolder[kHolder]) {
-        serviceHolder[kHolder] = {};
+    if (!holder[kHolder]) {
+        holder[kHolder] = {};
     }
-    serviceHolder[kHolder][key] = instance;
+    holder[kHolder][key] = instance;
 }
 
-function getHolderInstance(serviceHolder, key) {
-    if (!serviceHolder || !serviceHolder[kHolder]) {
+function getHolderInstances(holder) {
+    return {
+        ...holder[kHolder]
+    };
+}
+
+function getHolderInstance(holder, key) {
+    if (!holder || !holder[kHolder]) {
         return;
     }
-    return serviceHolder[kHolder][key];
+    return holder[kHolder][key];
 }
 
 function isInstanceKey(key) {
