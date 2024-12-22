@@ -200,6 +200,17 @@ export function getServiceBinder(serviceAware) {
     }
 }
 
+
+export function getGlobalServices() {
+    let services = getGlobalContext()[kServices];
+    if (!services) {
+        // create a new global services
+        services = createAppServicesInstance();
+        getGlobalContext()[kServices] = services;
+    }
+    return services;
+}
+
 // --------------------------------------------------------------------------------------------
 // Private functions
 // --------------------------------------------------------------------------------------------
@@ -276,6 +287,7 @@ function createServiceBuilder(serviceAware) {
 }
 
 class ServiceContext {
+    #id;
     #parent;
     #localServices = {
         get [kServicesFlag]() {
@@ -290,6 +302,7 @@ class ServiceContext {
 
     constructor(parent) {
         this.#parent = parent;
+        this.#id = __id__++;
     }
 
     get [kServicesFlag]() {
@@ -406,19 +419,6 @@ function isInstanceKey(key) {
     return typeof key === 'string';
 }
 
-function getGlobalServices(type) {
-    let contexts = getGlobalContext()[kServices];
-    if (contexts) {
-        if (type !== undefined) {
-            return contexts[type];
-        } else {
-            let types = Object.keys(contexts);
-            if (types.length > 0) {
-                return contexts[types[0]];
-            }
-        }
-    }
-}
 
 function getScopes(serviceAware) {
     let servicesScopes = getServices(serviceAware)[kScopes];

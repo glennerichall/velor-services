@@ -1,8 +1,10 @@
 import {
     createAppServicesInstance,
+    getGlobalServices,
     getInstanceBinder,
     getServiceBinder,
     getServiceBuilder,
+    getServices,
     isServiceAware,
     SCOPE_PROTOTYPE,
     SCOPE_REQUEST,
@@ -17,6 +19,7 @@ import {
 import {setupTestContext} from "velor-utils/test/setupTestContext.mjs";
 import {s_logger} from "../application/services/serviceKeys.mjs";
 import {getLogger} from "../application/services/services.mjs";
+import {getGlobalContext} from "velor-utils/utils/global.mjs";
 
 // Example classes for testing
 class SingletonClass {
@@ -375,7 +378,7 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         expect(getEnvValue(clone, "env3")).to.equal(40);
     })
 
-    test('should get logger from binded instance', async () => {
+    test('should get logger from bound instance', async () => {
         let holder = {};
         let logger = {
             debug: sinon.stub()
@@ -383,5 +386,15 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         getInstanceBinder(holder).setInstance(s_logger, logger);
 
         expect(getLogger(holder)).to.eq(logger);
+    })
+
+    test('getGlobalContextshould be a singleton', async()=> {
+        expect(getGlobalServices()).to.eq(getGlobalServices());
+    })
+
+    test('should get global services with binder', async()=> {
+        class Mock{}
+        let instance = getServiceBinder().createInstance(Mock);
+        expect(getServices(instance)).to.eq(getGlobalServices());
     })
 });
