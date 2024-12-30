@@ -19,7 +19,6 @@ import {
 import {setupTestContext} from "velor-utils/test/setupTestContext.mjs";
 import {s_logger} from "../application/services/serviceKeys.mjs";
 import {getLogger} from "../application/services/services.mjs";
-import {getGlobalContext} from "velor-utils/utils/global.mjs";
 
 // Example classes for testing
 class SingletonClass {
@@ -68,8 +67,13 @@ const {
     test
 } = setupTestContext()
 
+
+
 test.describe('ServicesContext and Provider (Scope Management) with Dependency Injection', function () {
     let servicesContext, anInstance;
+
+    const symKey = Symbol();
+    const symInst = {};
 
     test.beforeEach(function () {
         anInstance = {}
@@ -93,7 +97,10 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
                     factory: () => new InstanceClass(),
                     scope: SCOPE_REQUEST
                 },
-                factoryFromClass: ClassWithCtorArgs
+                factoryFromClass: ClassWithCtorArgs,
+                [symKey]: () => {
+                    return symInst;
+                }
             }
         });
     });
@@ -388,13 +395,20 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         expect(getLogger(holder)).to.eq(logger);
     })
 
-    test('getGlobalContextshould be a singleton', async()=> {
+    test('getGlobalContextshould be a singleton', async () => {
         expect(getGlobalServices()).to.eq(getGlobalServices());
     })
 
-    test('should get global services with binder', async()=> {
-        class Mock{}
+    test('should get global services with binder', async () => {
+        class Mock {
+        }
+
         let instance = getServiceBinder().createInstance(Mock);
         expect(getServices(instance)).to.eq(getGlobalServices());
+    })
+
+    test('should allow symbol as service key', async () => {
+        let instance = getProvider(servicesContext)[symKey]();
+        expect(instance).to.eq(symInst);
     })
 });

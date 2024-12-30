@@ -416,7 +416,7 @@ function getHolderInstance(holder, key) {
 }
 
 function isInstanceKey(key) {
-    return typeof key === 'string';
+    return typeof key === 'string' || typeof key === "symbol";
 }
 
 
