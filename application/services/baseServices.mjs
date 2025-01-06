@@ -4,6 +4,7 @@ import {
     getEnvironment as _getEnvironment,
     getFactories as _getFactories,
     getProvider as _getProvider,
+    getServiceBuilder,
     getServices
 } from "../../injection/ServicesContext.mjs";
 import {getEnvNameResolver} from "./services.mjs";
@@ -59,7 +60,7 @@ export function getBoolValue(serviceAware, name, defaultValue) {
 
 export function setEnvValue(serviceAware, name, value) {
     let fullName = getEnvName(serviceAware, name);
-    getEnvironment(serviceAware)[fullName] = value;
+    getServiceBuilder(serviceAware).addEnv(fullName, value);
 }
 
 export function getEnvValueArray(serviceAware, name, separator = ";") {

@@ -7,7 +7,8 @@ import {
     getEnvValueIndirect,
     getEnvValues,
     getNodeEnv,
-    isProduction
+    isProduction,
+    setEnvValue
 } from "../application/services/baseServices.mjs";
 import {ENV_TEST} from "velor-utils/env.mjs";
 
@@ -99,6 +100,16 @@ test.describe('environment', () => {
 
         test('should get variable indirect', () => {
             expect(getEnvValueIndirect(services, 'VAR_B_VAR')).to.eq('valueB');
+        })
+
+        test('should set variable value', () => {
+            setEnvValue(services, 'VAR_C', 'valueC');
+            expect(getEnvValue(services, 'VAR_C')).to.eq('valueC');
+        })
+
+        test('should overwrite variable value', () => {
+            setEnvValue(services, 'toto_VAR_A', 'valueC');
+            expect(getEnvValue(services, 'toto_VAR_A')).to.eq('valueC');
         })
     })
 })
