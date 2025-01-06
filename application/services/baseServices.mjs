@@ -13,6 +13,7 @@ import {
     ENV_STAGING,
     ENV_TEST
 } from "velor-utils/env.mjs";
+import {isTrue} from "velor-utils/utils/predicates.mjs";
 
 export function getNodeEnv(services) {
     return getEnvironment(services).NODE_ENV;
@@ -49,6 +50,11 @@ export function getEnvValue(serviceAware, name, defaultValue) {
         value = defaultValue;
     }
     return value;
+}
+
+export function getBoolValue(serviceAware, name, defaultValue) {
+    let value = getEnvValue(serviceAware, name, defaultValue);
+    return isTrue(value);
 }
 
 export function setEnvValue(serviceAware, name, value) {
