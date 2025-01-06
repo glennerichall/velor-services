@@ -51,6 +51,11 @@ export function getEnvValue(serviceAware, name, defaultValue) {
     return value;
 }
 
+export function setEnvValue(serviceAware, name, value) {
+    let fullName = getEnvName(serviceAware, name);
+    getEnvironment(serviceAware)[fullName] = value;
+}
+
 export function getEnvValueArray(serviceAware, name, separator = ";") {
     let fullName = getEnvName(serviceAware, name);
     let value = getEnvironment(serviceAware)[fullName];
