@@ -180,7 +180,7 @@ export function getServiceBinder(serviceAware) {
                     instance = factory(services, ...args);
                     instance[kKey] = classOrKey;
                 } else {
-                    throw new Error(`Provide a factory function for key ${classOrKey}`);
+                    throw new Error(`Provide a factory function for key ${classOrKey?.toString()}`);
                 }
             } else if (isClass(classOrKey)) {
                 instance = new classOrKey(...args);
@@ -511,9 +511,9 @@ function getFactoryForKey(services, key) {
     let clazz = getClasses(services)[key];
     let factory;
     if (clazz && definition) {
-        throw new Error(`Provide a class or a factory for "${key}" not both`);
+        throw new Error(`Provide a class or a factory for "${key?.toString()}" not both`);
     } else if (!clazz && !definition) {
-        throw new Error(`Provide a factory or a class for "${key}"`);
+        throw new Error(`Provide a factory or a class for "${key?.toString()}"`);
     }
     if (typeof definition === 'object') {
         if (typeof definition.factory === 'function') {

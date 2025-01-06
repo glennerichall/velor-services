@@ -68,7 +68,6 @@ const {
 } = setupTestContext()
 
 
-
 test.describe('ServicesContext and Provider (Scope Management) with Dependency Injection', function () {
     let servicesContext, anInstance;
 
@@ -427,4 +426,10 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         let instance = getProvider(servicesContext)[symKey]();
         expect(instance).to.eq(symInst);
     })
+
+    test('should throw error if no factory', () => {
+        expect(getProvider(servicesContext)[Symbol("fetch")]).to
+            .throw(Error, 'Provide a factory or a class for "Symbol(fetch)"');
+    })
+
 });
