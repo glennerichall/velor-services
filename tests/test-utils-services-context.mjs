@@ -288,22 +288,38 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         expect(getProvider(servicesContext).singletonService()).to.eq(obj1);
     });
 
+    test('instance binder should allow symbols', async () => {
+        let obj1 = {
+            name: 'foobar'
+        };
+        let symbol = Symbol('test');
+        let holder = {};
+        getServiceBinder(servicesContext).makeServiceAware(holder);
+        getInstanceBinder(servicesContext).setInstance(symbol, obj1);
+        let obj2 = getProvider(holder)[symbol]();
+        expect(obj2).to.equal(obj1);
+        expect(getProvider(servicesContext)[symbol]()).to.eq(obj1);
+    });
+
     test('services clone must convey all installed instances', async () => {
         let obj1 = {
             name: 'foobar'
         };
         let holder = {};
 
-        getInstanceBinder(servicesContext).setInstance('singletonService', obj1);
+        let symbol = Symbol('test');
+
+        getInstanceBinder(servicesContext).setInstance(symbol, obj1);
+
         let clone = getServiceBuilder(servicesContext)
             .clone()
             .done();
 
-        expect(getProvider(clone).singletonService()).to.eq(obj1);
+        expect(getProvider(clone)[symbol]()).to.eq(obj1);
 
         getServiceBinder(clone).makeServiceAware(holder);
 
-        let obj2 = getProvider(holder).singletonService();
+        let obj2 = getProvider(holder)[symbol]();
         expect(obj2).to.equal(obj1);
 
     });

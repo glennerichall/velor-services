@@ -130,6 +130,10 @@ export function getInstanceBinder(holder) {
             for (let key in instances) {
                 setHolderInstance(other, key, instances[key]);
             }
+            const symbols = Object.getOwnPropertySymbols(instances);
+            for (let key of symbols) {
+                setHolderInstance(other, key, instances[key]);
+            }
             return this;
         }
     };
