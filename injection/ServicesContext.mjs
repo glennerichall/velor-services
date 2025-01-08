@@ -22,6 +22,7 @@ let kConstants = Symbol('services-constants');
 let kScopes = Symbol('services-scopes');
 let kServicesFlag = Symbol('is-services');
 let kBuilder = Symbol('services-builder');
+let kProxyTarget = Symbol('services-proxy-target');
 
 // --------------------------------------------------------------------------------------------
 // Public functions
@@ -221,12 +222,26 @@ export function getScopeNames(serviceAware) {
     return Object.keys(getScopes(serviceAware));
 }
 
+export function isInstanceOf(servicesAware, clazz) {
+    return isServiceAware(servicesAware) &&
+        unpackProxy(servicesAware) instanceof clazz;
+}
+
+export function getClasses(servicesAware) {
+    return {...getServices(servicesAware)[kClasses]};
+}
+
+export function areSame(instance1, instance2) {
+    return (unpackProxy(instance1) ?? instance1) ===
+        (unpackProxy(instance2) ?? instance2);
+}
+
 // --------------------------------------------------------------------------------------------
 // Private functions
 // --------------------------------------------------------------------------------------------
 
-export function getClasses(servicesAware) {
-    return {...getServices(servicesAware)[kClasses]};
+function unpackProxy(servicesAware) {
+    return servicesAware[kProxyTarget];
 }
 
 function createServiceBuilder(serviceAware) {
@@ -313,6 +328,10 @@ class ServiceContext {
     constructor(parent) {
         this.#parent = parent;
         this.#id = __id__++;
+    }
+
+    get [kUuid]() {
+        return this.#id;
     }
 
     get [kServicesFlag]() {
@@ -503,7 +522,45 @@ function provideInstance(serviceAware, key, args) {
 function createServiceProvider(serviceAware) {
     return new Proxy({}, {
         get(target, key, receiver) {
-            return (...args) => provideInstance(serviceAware, key, args)
+            return (...args) => {
+                let instance = provideInstance(serviceAware, key, args);
+
+                return new Proxy({}, {
+                    has(target, prop) {
+                        if (prop === Symbol.hasInstance) {
+                            return true;
+                        }
+                        return prop in instance;
+                    },
+
+                    get(target, prop, receiver) {
+                        if (prop === Symbol.toStringTag ||
+                            prop === Symbol.iterator ||
+                            prop === Symbol.hasInstance) {
+                            return instance[prop];
+
+                        } else if (prop === kProxyTarget) {
+                            return instance;
+
+                        } else if (prop === kServices) {
+                            return getServices(serviceAware);
+
+                        } else if (prop in instance) {
+                            const value = Reflect.get(instance, prop, receiver);
+                            if (typeof value === "function" && prop !== "constructor") {
+                                return value.bind(receiver);
+                            }
+                            return value;
+                        }
+                        return undefined;
+                    },
+
+                    set(target, prop, value, receiver) {
+                        Reflect.set(instance, prop, value);
+                        return true; // Indicates success
+                    },
+                });
+            }
         }
     });
 }
