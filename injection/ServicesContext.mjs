@@ -71,7 +71,7 @@ export function createAppServicesInstance(options = {}) {
     factories = {...factories};
     classes = {...classes};
 
-    let services = {
+    let rootServices = {
         get [kServicesFlag]() {
             return true;
         },
@@ -88,13 +88,16 @@ export function createAppServicesInstance(options = {}) {
     };
 
     let scopeNames = [SCOPE_SINGLETON, ...new Set(Object.keys(factories)
-        .map(key => findScopeNameHintForKey(services, key)))];
+        .map(key => findScopeNameHintForKey(rootServices, key)))];
+
+    let services = new ServiceContext(rootServices);
 
     for (let name of scopeNames) {
-        createScope(services, name);
+        let scope = createScope(rootServices, name);
+        scope[kServices] = services;
     }
 
-    return new ServiceContext(services);
+    return services;
 }
 
 export function getServices(serviceAware) {
@@ -145,10 +148,10 @@ export function getServiceBuilder(serviceAware) {
         services[kBuilder] :
         createServiceBuilder(serviceAware);
 
-    builder.clone = () => {
-        let proxy = new ServiceContext(services);
-        getInstanceBinder(services).setInstancesTo(proxy)
-        return proxy[kBuilder];
+    builder.extend = () => {
+        let childInstance = new ServiceContext(services);
+        getInstanceBinder(services).setInstancesTo(childInstance)
+        return getServiceBuilder(childInstance);
     };
 
     return builder;
@@ -198,12 +201,11 @@ export function getServiceBinder(serviceAware) {
             createScope(instance, scopeName, instances);
             return this;
         },
-        clone(instance, ...args) {
+        extend(instance, ...args) {
             return this.createInstance(instance.constructor, ...args);
         }
     }
 }
-
 
 export function getGlobalServices() {
     let services = getGlobalContext()[kServices];
@@ -213,6 +215,10 @@ export function getGlobalServices() {
         getGlobalContext()[kServices] = services;
     }
     return services;
+}
+
+export function getScopeNames(serviceAware) {
+    return Object.keys(getScopes(serviceAware));
 }
 
 // --------------------------------------------------------------------------------------------
@@ -322,38 +328,38 @@ class ServiceContext {
     }
 
     get [kClasses]() {
-        return {
+        return Object.freeze({
             ...this.#parent[kClasses],
             ...this.#localServices[kClasses]
-        };
+        });
     }
 
     get [kScopes]() {
-        return {
+        return Object.freeze({
             ...this.#parent[kScopes],
             ...this.#localServices[kScopes]
-        };
+        });
     }
 
     get [kConstants]() {
-        return {
+        return Object.freeze({
             ...this.#parent[kConstants],
             ...this.#localServices[kConstants]
-        };
+        });
     }
 
     get [kFactories]() {
-        return {
+        return Object.freeze({
             ...this.#parent[kFactories],
             ...this.#localServices[kFactories]
-        };
+        });
     }
 
     get [kEnv]() {
-        return {
+        return Object.freeze({
             ...this.#parent[kEnv],
             ...this.#localServices[kEnv]
-        };
+        });
     }
 }
 
@@ -423,10 +429,13 @@ function isInstanceKey(key) {
     return typeof key === 'string' || typeof key === "symbol";
 }
 
-
 function getScopes(serviceAware) {
     let servicesScopes = getServices(serviceAware)[kScopes];
+
+    // This should not occur, for future use only.
+    // Get scopes declared directly on serviceAware instance
     let ownScopes = serviceAware[kScopes] ?? {};
+
     return {
         ...servicesScopes,
         ...ownScopes
@@ -437,62 +446,64 @@ function getScope(services, name) {
     return getScopes(services)[name];
 }
 
+function provideInstance(serviceAware, key, args) {
+    // local holder instances are prioritized
+    let instance = getHolderInstance(serviceAware, key);
+    if (instance) return instance;
+
+    let services = getServices(serviceAware);
+
+    // second shot, maybe we set an instance directly on services.
+    instance = getHolderInstance(services, key);
+    if (instance) return instance;
+
+    // if not, find the scope of the key
+    const scopeNameHint = findScopeNameHintForKey(services, key);
+
+    // ensure the scope exists
+    let scope = getScope(serviceAware, scopeNameHint);
+
+    if (scopeNameHint === SCOPE_PROTOTYPE) {
+        // Create a volatile scope for prototypes.
+        // This scope will not be retained on function return.
+        scope = createScope(null, SCOPE_PROTOTYPE);
+    }
+
+    if (!scope) {
+        throw new Error(`Define scope "${scopeNameHint}" in ServicesContext`);
+    }
+
+    // find the instance in scopes
+    let scopes = getScopes(services);
+    for (let scopeName in scopes) {
+        let scope = scopes[scopeName];
+        instance = scope.instances[key];
+        if (instance) {
+            // this should not occur, but if it is not already a service aware make it.
+            if (!isServiceAware(instance)) {
+                getServiceBinder(scope[kServices] ?? services).makeServiceAware(instance);
+            }
+            break;
+        }
+    }
+
+    // no instance found in scopes, just create a new instance
+    if (instance === undefined) {
+        instance = getServiceBinder(scope[kServices] ?? services).createInstance(key, ...args);
+        // for prototype scope, a new instance is created on each call
+        // consequently we do not save the instance in scopes
+        if (scopeNameHint !== SCOPE_PROTOTYPE) {
+            scope.instances[key] = instance;
+        }
+    }
+
+    return instance;
+}
+
 function createServiceProvider(serviceAware) {
     return new Proxy({}, {
         get(target, key, receiver) {
-            return (...args) => {
-
-                // local holder instances are prioritized
-                let instance = getHolderInstance(serviceAware, key);
-                if (instance) return instance;
-
-                let services = getServices(serviceAware);
-
-                // second shot, maybe we set an instance directly on services.
-                instance = getHolderInstance(services, key);
-                if (instance) return instance;
-
-                // if not, find the scope of the key
-                const scopeNameHint = findScopeNameHintForKey(services, key);
-
-                // ensure the scope exists
-                let scope = getScope(serviceAware, scopeNameHint);
-
-                if (scopeNameHint === SCOPE_PROTOTYPE) {
-                    // create a volatile scope for prototypes
-                    scope = createScope(null, SCOPE_PROTOTYPE);
-                }
-
-                if (!scope) {
-                    throw new Error(`Define scope "${scopeNameHint}" in ServicesContext`);
-                }
-
-                // find the instance in scopes
-                let scopes = getScopes(services);
-                for (let scopeName in scopes) {
-                    let scope = scopes[scopeName];
-                    instance = scope.instances[key];
-                    if (instance) {
-                        // this should not occur, but if it is not already a service aware make it.
-                        if (!isServiceAware(instance)) {
-                            getServiceBinder(services).makeServiceAware(instance);
-                        }
-                        break;
-                    }
-                }
-
-                // no instance found in scopes, just create a new instance
-                if (instance === undefined) {
-                    instance = getServiceBinder(services).createInstance(key, ...args);
-                    // for prototype scope, a new instance is created on each call
-                    // consequently we do not save the instance in scopes
-                    if (scopeNameHint !== SCOPE_PROTOTYPE) {
-                        scope.instances[key] = instance;
-                    }
-                }
-
-                return instance;
-            }
+            return (...args) => provideInstance(serviceAware, key, args)
         }
     });
 }

@@ -2,6 +2,7 @@ import {
     createAppServicesInstance,
     getGlobalServices,
     getInstanceBinder,
+    getScopeNames,
     getServiceBinder,
     getServiceBuilder,
     getServices,
@@ -181,7 +182,7 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
             const singletonService = getProvider(servicesContext).singletonService();
 
             // Check if the factory was called with the correct argument (ServicesContext)
-            expect(factorySpy.calledOnce).to.be.true; // Ensure the factory was called exactly once
+            expect(factorySpy).calledOnce; // Ensure the factory was called exactly once
             expect(factorySpy.firstCall.args[0]).to.equal(servicesContext); // Check that the first argument is the
                                                                             // ServicesContext
             expect(singletonService).to.be.an('object');
@@ -224,14 +225,14 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
 
     test('cloneWithScope should clone servicesContext with a new scope', function () {
         let cloneServicesContext = getServiceBuilder(servicesContext)
-            .clone().addScope(SCOPE_REQUEST).done();
+            .extend().addScope(SCOPE_REQUEST).done();
         expect(cloneServicesContext).to.not.equal(servicesContext);
         expect(isServiceAware(cloneServicesContext)).to.be.true;
     });
 
     test('cloneWithScope clone should share parent scopes', function () {
         let cloneServicesContext = getServiceBuilder(servicesContext)
-            .clone().addScope(SCOPE_REQUEST).done();
+            .extend().addScope(SCOPE_REQUEST).done();
 
         expect(getProvider(cloneServicesContext).singletonService()).to
             .equal(getProvider(servicesContext).singletonService());
@@ -239,7 +240,7 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
 
     test('cloneWithScope clone not should share new scope', function () {
         let cloneServicesContext = getServiceBuilder(servicesContext)
-            .clone()
+            .extend()
             .addScope(SCOPE_REQUEST)
             .done();
 
@@ -273,7 +274,6 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         expect(obj2).to.equal(obj1);
         expect(getProvider(servicesContext).singletonService()).to.not.eq(obj1);
     });
-
 
     test('instance binder may shadow values directly on services', async () => {
         let obj1 = {
@@ -311,7 +311,7 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         getInstanceBinder(servicesContext).setInstance(symbol, obj1);
 
         let clone = getServiceBuilder(servicesContext)
-            .clone()
+            .extend()
             .done();
 
         expect(getProvider(clone)[symbol]()).to.eq(obj1);
@@ -344,7 +344,6 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
 
         expect(() => getProvider(servicesContext).obj()).to.throw(Error, /Define scope "customScope" in ServicesContext/);
     });
-
 
     test('provider should not fail for no scope in holder', async () => {
         let holder = {};
@@ -390,7 +389,7 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         expect(getEnvValue(servicesContext, "env2")).to.equal(20);
 
         let clone = getServiceBuilder(servicesContext)
-            .clone()
+            .extend()
             .addEnv("env2", 30)
             .addEnv("env3", 40)
             .done();
@@ -430,6 +429,118 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
     test('should throw error if no factory', () => {
         expect(getProvider(servicesContext)[Symbol("fetch")]).to
             .throw(Error, 'Provide a factory or a class for "Symbol(fetch)"');
+    })
+
+    test('should only create scope in clone', () => {
+        let services = createAppServicesInstance();
+
+        let clone = getServiceBuilder(services).extend()
+            .addScope(SCOPE_REQUEST).done();
+
+        expect(getScopeNames(services)).to.deep.eq([SCOPE_SINGLETON]);
+        expect(getScopeNames(clone)).to.deep.eq([SCOPE_SINGLETON, SCOPE_REQUEST]);
+    })
+
+    test('should create scopes for provided factories', () => {
+        let services = createAppServicesInstance({
+            factories: {
+                dummy: {
+                    scope: SCOPE_REQUEST,
+                    factory: () => null
+                }
+            }
+        });
+
+        let clone = getServiceBuilder(services).extend()
+            .addScope("dummy").done();
+
+        expect(getScopeNames(services)).to.deep.eq([SCOPE_SINGLETON, SCOPE_REQUEST]);
+        expect(getScopeNames(clone)).to.deep.eq([SCOPE_SINGLETON, SCOPE_REQUEST, "dummy"]);
+    })
+
+    test('should create instance and bind services to scope owning', () => {
+        let a = {};
+
+        let aFactory = sinon.stub().returns(a);
+
+        let services = createAppServicesInstance({
+            factories: {
+                a: aFactory,
+            }
+        });
+
+        let clone = getServiceBuilder(services)
+            .extend().done();
+
+        // Clone of services is created.
+        // "a" instance is not created initially.
+        // "a" should have been placed into original services singleton scope event if created
+        // when calling provider on clone services, because clone has no scopes declared.
+        expect(getProvider(clone).a()).to.eq(a);
+        expect(getProvider(services).a()).to.eq(a);
+        expect(getServices(a)).to.eq(services);
+
+        expect(aFactory).calledOnce;
+    })
+
+    test('should clone services instance and bind services to scope owning', () => {
+        let a = {};
+
+        let aFactory = sinon.stub().returns(a);
+
+        let services = createAppServicesInstance({
+            factories: {
+                a: aFactory,
+            }
+        });
+
+        let subclone = getServiceBuilder(services)
+            .extend().extend().done();
+
+        expect(getProvider(subclone).a()).to.eq(a);
+        expect(getProvider(services).a()).to.eq(a);
+
+        expect(getServices(a)).to.eq(services);
+
+        expect(aFactory).calledOnce;
+    })
+
+    test('should handle scope redeclaration correctly', async () => {
+        let a = {
+            prop: 'value',
+            getB() {
+                return getProvider(this).b();
+            }
+        };
+
+        let aFactory = sinon.stub().returns(a);
+        let bFactory = sinon.stub().callsFake(() => {
+            return {};
+        });
+
+        let services = createAppServicesInstance({
+            factories: {
+                a: aFactory,
+                b: {
+                    scope: SCOPE_REQUEST,
+                    factory: bFactory
+                },
+            }
+        });
+
+
+        let clone = getServiceBuilder(services).extend()
+            .addScope(SCOPE_REQUEST).done();
+
+        // "b" instance is created inside request scope of services since "a" is created there
+        let b1 = getProvider(clone).a().getB();
+        expect(getProvider(clone).a().getB()).to.deep.eq(b1);
+
+        expect(getServices(b1)).to.eq(services);
+        expect(getServices(a)).to.eq(services);
+
+        expect(getProvider(services).a().getB()).to.deep.eq(b1);
+
     })
 
 });
