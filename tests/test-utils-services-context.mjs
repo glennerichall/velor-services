@@ -9,6 +9,7 @@ import {
     getServices,
     getUuid,
     isInstanceOf,
+    isProxy,
     isServiceAware,
     SCOPE_PROTOTYPE,
     SCOPE_REQUEST,
@@ -730,5 +731,46 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         let keys = Object.keys(getProvider(services).a());
         expect(keys).to.deep.eq(['prop', 'getB']);
 
+    })
+
+    test('should not bind proxy to free functions', () => {
+
+        let a = {
+            freeFct: () => {
+                if (this) {
+                    throw new Error();
+                }
+            },
+            notSoFree: function () {
+                if (!this || isProxy(this)) {
+                    throw new Error();
+                }
+            },
+            method() {
+                if (!this || !isProxy(this)) {
+                    throw new Error();
+                }
+            }
+        };
+
+        function freeMeToo() {
+            if (!this || isProxy(this)) {
+                throw new Error();
+            }
+        }
+
+        a.freeMeToo = freeMeToo;
+
+        let aFactory = sinon.stub().returns(a);
+        let services = createAppServicesInstance({
+            factories: {
+                a: aFactory,
+            }
+        });
+
+        getProvider(services).a().freeFct();
+        getProvider(services).a().freeMeToo();
+        getProvider(services).a().method();
+        getProvider(services).a().notSoFree();
     })
 });

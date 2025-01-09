@@ -237,6 +237,10 @@ export function areSame(instance1, instance2) {
         (unpackProxy(instance2) ?? instance2);
 }
 
+export function isProxy(instance) {
+    return !!instance[kProxyTarget];
+}
+
 // --------------------------------------------------------------------------------------------
 // Private functions
 // --------------------------------------------------------------------------------------------
@@ -567,10 +571,17 @@ function createServiceProvider(serviceAware) {
 
                         } else if (prop in instance) {
                             const value = Reflect.get(instance, prop, receiver);
-                            if (typeof value === "function" && prop !== "constructor") {
-                                // All methods in original instance are now bound to the current proxy instance.
-                                // This requires that no private #property are declared in instance classes.
-                                return value.bind(receiver);
+                            if (typeof value === "function") {
+                                if (prop !== "constructor") {
+                                    if (!value.hasOwnProperty('prototype')) {
+
+                                        // All methods in original instance are now bound to the current proxy instance.
+                                        // This imposes that no private #property is declared in instance classes.
+                                        return value.bind(receiver);
+                                    } else {
+                                        return value.bind(instance);
+                                    }
+                                }
                             }
                             return value;
                         }
