@@ -23,6 +23,7 @@ let kScopes = Symbol('services-scopes');
 let kServicesFlag = Symbol('is-services');
 let kBuilder = Symbol('services-builder');
 let kProxyTarget = Symbol('services-proxy-target');
+let kServicesAware = Symbol('services-aware');
 
 // --------------------------------------------------------------------------------------------
 // Public functions
@@ -240,6 +241,23 @@ export function areSame(instance1, instance2) {
 export function isProxy(instance) {
     return !!instance[kProxyTarget];
 }
+
+export const ServiceAwareMixin = Parent => class extends Parent {
+    constructor(...args) {
+        super(...args);
+    }
+
+    get [kServicesAware]() {
+        return true;
+    }
+
+    get isServiceAware() {
+        return this[kServicesAware];
+    }
+}
+
+export const ServiceAware = ServiceAwareMixin(class {
+});
 
 // --------------------------------------------------------------------------------------------
 // Private functions
@@ -535,6 +553,55 @@ function provideInstance(serviceAware, key, args) {
     return instance;
 }
 
+function makeServiceAwareProxy(instance, serviceAware) {
+    return new Proxy(instance, {
+        has(target, prop) {
+            if (prop === Symbol.hasInstance) {
+                return true;
+            }
+            return prop in instance;
+        },
+
+        ownKeys(target) {
+            return Object.keys(instance);
+        },
+
+        get(target, prop, receiver) {
+            if (prop === Symbol.toStringTag ||
+                prop === Symbol.iterator ||
+                prop === Symbol.hasInstance) {
+                return instance[prop];
+
+            } else if (prop === kProxyTarget) {
+                return instance;
+
+            } else if (prop === kServices) {
+                return getServices(serviceAware);
+
+            } else if (prop in instance) {
+                const value = Reflect.get(instance, prop, receiver);
+                if (typeof value === "function") {
+                    if (prop !== "constructor") {
+                        if (!value.hasOwnProperty('prototype')) {
+
+                            // All methods in original instance are now bound to the current proxy instance.
+                            // This imposes that no private #property is declared in instance classes.
+                            return value.bind(receiver);
+                        }
+                    }
+                }
+                return value;
+            }
+            return undefined;
+        },
+
+        set(target, prop, value, receiver) {
+            Reflect.set(instance, prop, value);
+            return true; // Indicates success
+        },
+    });
+}
+
 function createServiceProvider(serviceAware) {
     return new Proxy({}, {
         get(target, key, receiver) {
@@ -544,55 +611,13 @@ function createServiceProvider(serviceAware) {
                 // proxy[kServices] = getServices(serviceAware);
                 // return proxy;
 
+                if (instance[kServicesAware]) {
+                    return makeServiceAwareProxy(instance, serviceAware);
+                } else {
+                    return instance;
+                }
 
-                return new Proxy(instance, {
-                    has(target, prop) {
-                        if (prop === Symbol.hasInstance) {
-                            return true;
-                        }
-                        return prop in instance;
-                    },
 
-                    ownKeys(target) {
-                        return Object.keys(instance);
-                    },
-
-                    get(target, prop, receiver) {
-                        if (prop === Symbol.toStringTag ||
-                            prop === Symbol.iterator ||
-                            prop === Symbol.hasInstance) {
-                            return instance[prop];
-
-                        } else if (prop === kProxyTarget) {
-                            return instance;
-
-                        } else if (prop === kServices) {
-                            return getServices(serviceAware);
-
-                        } else if (prop in instance) {
-                            const value = Reflect.get(instance, prop, receiver);
-                            if (typeof value === "function") {
-                                if (prop !== "constructor") {
-                                    if (!value.hasOwnProperty('prototype')) {
-
-                                        // All methods in original instance are now bound to the current proxy instance.
-                                        // This imposes that no private #property is declared in instance classes.
-                                        return value.bind(receiver);
-                                    } else {
-                                        return value.bind(instance);
-                                    }
-                                }
-                            }
-                            return value;
-                        }
-                        return undefined;
-                    },
-
-                    set(target, prop, value, receiver) {
-                        Reflect.set(instance, prop, value);
-                        return true; // Indicates success
-                    },
-                });
             }
         }
     });

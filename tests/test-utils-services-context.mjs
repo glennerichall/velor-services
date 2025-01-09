@@ -14,6 +14,7 @@ import {
     SCOPE_PROTOTYPE,
     SCOPE_REQUEST,
     SCOPE_SINGLETON,
+    ServiceAware,
 } from "../injection/ServicesContext.mjs";
 import sinon from "sinon";
 import {
@@ -630,11 +631,13 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
     })
 
     test('should handle scope redeclaration correctly', async () => {
-        let a = {
+        class MyClass extends ServiceAware {
             getB() {
                 return getProvider(this).b();
             }
-        };
+        }
+
+        let a = new MyClass();
 
         let aFactory = sinon.stub().returns(a);
         let bFactory = sinon.stub().callsFake(() => {
@@ -650,7 +653,6 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
                 },
             }
         });
-
 
         let clone = getServiceBuilder(services).extend()
             .addScope(SCOPE_REQUEST).done();
@@ -669,12 +671,15 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
     })
 
     test('should get another instance from service aware instance', async () => {
-        let a = {
-            prop: 'value',
+        class MyClass extends ServiceAware {
+            prop = 'value';
+
             getB() {
                 return getProvider(this).b();
             }
-        };
+        }
+
+        let a = new MyClass();
 
         let aFactory = sinon.stub().returns(a);
         let bFactory = sinon.stub().callsFake(() => {
@@ -733,28 +738,66 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
 
     })
 
-    test('should not bind proxy to free functions', () => {
+    test('should not get object as proxy if not service aware', () => {
 
-        let a = {
-            freeFct: () => {
-                if (this) {
-                    throw new Error();
-                }
-            },
-            notSoFree: function () {
+        class MyClass {
+        }
+
+        let a = new MyClass();
+
+        let aFactory = sinon.stub().returns(a);
+        let services = createAppServicesInstance({
+            factories: {
+                a: aFactory,
+            }
+        });
+
+        expect(isProxy(getProvider(services).a())).to.be.false;
+    })
+
+    test('should get object as proxy if service aware', () => {
+
+        class MyClass extends ServiceAware {
+        }
+
+        let a = new MyClass();
+
+        let aFactory = sinon.stub().returns(a);
+        let services = createAppServicesInstance({
+            factories: {
+                a: aFactory,
+            }
+        });
+
+        expect(isProxy(getProvider(services).a())).to.be.true;
+    })
+
+    test('should bind to functions', () => {
+
+        class MyClass extends ServiceAware {
+            freeFct = () => {
                 if (!this || isProxy(this)) {
                     throw new Error();
                 }
-            },
+            }
+
+            notSoFree = function () {
+                if (!this || !isProxy(this)) {
+                    throw new Error();
+                }
+            }
+
             method() {
                 if (!this || !isProxy(this)) {
                     throw new Error();
                 }
             }
-        };
+        }
+
+        let a = new MyClass();
 
         function freeMeToo() {
-            if (!this || isProxy(this)) {
+            if (!this || !isProxy(this)) {
                 throw new Error();
             }
         }
