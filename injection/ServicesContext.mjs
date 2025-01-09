@@ -225,8 +225,9 @@ export function getScopeNames(serviceAware) {
 }
 
 export function isInstanceOf(servicesAware, clazz) {
-    return isServiceAware(servicesAware) &&
-        unpackProxy(servicesAware) instanceof clazz;
+    return (isServiceAware(servicesAware) &&
+        unpackProxy(servicesAware) instanceof clazz) ||
+        servicesAware instanceof clazz;
 }
 
 export function getClasses(servicesAware) {
