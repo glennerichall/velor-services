@@ -23,7 +23,6 @@ import {
 import {setupTestContext} from "velor-utils/test/setupTestContext.mjs";
 import {s_logger} from "../application/services/serviceKeys.mjs";
 import {getLogger} from "../application/services/services.mjs";
-import {getProperties} from "chai/lib/chai/utils/getProperties.js";
 
 // Example classes for testing
 class SingletonClass {
@@ -295,7 +294,7 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
 
         let obj2 = getProvider(holder).singletonService();
         expect(areSame(obj2, obj1)).to.be.true;
-        expect(areSame(getProvider(servicesContext).singletonService(),obj1)).to.be.false;
+        expect(areSame(getProvider(servicesContext).singletonService(), obj1)).to.be.false;
     });
 
     test('instance binder may shadow values directly on services', async () => {
@@ -307,7 +306,7 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         getInstanceBinder(servicesContext).setInstance('singletonService', obj1);
         let obj2 = getProvider(holder).singletonService();
         expect(areSame(obj2, obj1)).to.be.true;
-        expect(areSame(getProvider(servicesContext).singletonService(),obj1)).to.be.true;
+        expect(areSame(getProvider(servicesContext).singletonService(), obj1)).to.be.true;
     });
 
     test('instance binder should allow symbols', async () => {
@@ -481,7 +480,7 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         expect(getScopeNames(clone)).to.deep.eq([SCOPE_SINGLETON, SCOPE_REQUEST, "dummy"]);
     })
 
-    test('should get properties of provided instance', ()=> {
+    test('should get properties of provided instance', () => {
         let a = {
             prop1: 'value1',
             prop2: 'value2',
@@ -501,7 +500,7 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         expect(instance.prop2).to.equal('value2');
     })
 
-    test('should set properties of provided instance', ()=> {
+    test('should set properties of provided instance', () => {
         let a = {
             prop1: 'value1',
             prop2: 'value2',
@@ -532,7 +531,7 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         expect(a.prop2).to.equal('newValue2');
     })
 
-    test('should bind methods to proxy', ()=> {
+    test('should bind methods to proxy', () => {
         let a = {
             prop1: 'value1',
             prop2: 'value2',
@@ -557,6 +556,26 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         a.prop1 = 'another_value';
         expect(instance.getProp1()).to.eq('another_value_in_getter');
 
+    })
+
+    test.skip('should internally get private properties of instance', () => {
+        class MyClass {
+            #prop1 = 'value1';
+            getProp1(val) {
+                return this.#prop1 + '_in_getter' + val;
+            }
+        }
+
+        let aFactory = sinon.stub().callsFake(()=> new MyClass());
+
+        let services = createAppServicesInstance({
+            factories: {
+                a: aFactory,
+            }
+        });
+
+        let instance = getProvider(services).a();
+        expect(instance.getProp1()).to.eq('value1_in_getter_toto');
     })
 
     test('should create instance and put in parent services scopes', () => {
@@ -610,7 +629,6 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
 
     test('should handle scope redeclaration correctly', async () => {
         let a = {
-            prop: 'value',
             getB() {
                 return getProvider(this).b();
             }
@@ -641,10 +659,10 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
 
         // "b2" is also in clone
         let b2 = getProvider(clone).a().getB();
+        expect(getServices(b2)).to.eq(clone);
 
         expect(getUuid(b2)).to.eq(getUuid(b1));
 
-        expect(getServices(b2)).to.eq(clone);
 
     })
 

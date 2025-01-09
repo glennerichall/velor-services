@@ -105,7 +105,8 @@ export function getServices(serviceAware) {
     if (serviceAware !== undefined) {
         let services = getServiceDirect(serviceAware) ??
             getServiceBound(serviceAware) ??
-            getServiceProperty(serviceAware);
+            getServiceProperty(serviceAware) ??
+            getServiceArguments(serviceAware);
 
         if (!services) {
             throw new Error(`serviceAware must be a ServicesContext or an object aware of services`);
@@ -394,6 +395,17 @@ function getServiceProperty(serviceAware) {
     return getServiceDirect(serviceAware?.services);
 }
 
+function isArguments(obj) {
+    return obj?.toString() === '[object Arguments]';
+}
+
+function getServiceArguments(serviceAware) {
+    if (isArguments(serviceAware)) {
+        return serviceAware[serviceAware.length - 1];
+    }
+    return undefined;
+}
+
 function createScope(tiedTo, name, instances = {}) {
 
     if (tiedTo && !tiedTo[kScopes]) {
@@ -524,6 +536,10 @@ function createServiceProvider(serviceAware) {
         get(target, key, receiver) {
             return (...args) => {
                 let instance = provideInstance(serviceAware, key, args);
+                // let proxy = Object.create(instance);
+                // proxy[kServices] = getServices(serviceAware);
+                // return proxy;
+
 
                 return new Proxy({}, {
                     has(target, prop) {
@@ -548,6 +564,8 @@ function createServiceProvider(serviceAware) {
                         } else if (prop in instance) {
                             const value = Reflect.get(instance, prop, receiver);
                             if (typeof value === "function" && prop !== "constructor") {
+                                // All methods in original instance are now bound to the current proxy instance.
+                                // This requires that no private #property are declared in instance classes.
                                 return value.bind(receiver);
                             }
                             return value;
