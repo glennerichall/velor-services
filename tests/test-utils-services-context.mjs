@@ -561,12 +561,13 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
     test.skip('should internally get private properties of instance', () => {
         class MyClass {
             #prop1 = 'value1';
+
             getProp1(val) {
                 return this.#prop1 + '_in_getter' + val;
             }
         }
 
-        let aFactory = sinon.stub().callsFake(()=> new MyClass());
+        let aFactory = sinon.stub().callsFake(() => new MyClass());
 
         let services = createAppServicesInstance({
             factories: {
@@ -709,4 +710,25 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
 
     })
 
+    test('should enumerate own keys', () => {
+        const sym = Symbol();
+        let a = {
+            prop: 'value',
+            [sym]: 'toto',
+            getB() {
+                return getProvider(this).b();
+            }
+        };
+
+        let aFactory = sinon.stub().returns(a);
+        let services = createAppServicesInstance({
+            factories: {
+                a: aFactory,
+            }
+        });
+
+        let keys = Object.keys(getProvider(services).a());
+        expect(keys).to.deep.eq(['prop', 'getB']);
+
+    })
 });

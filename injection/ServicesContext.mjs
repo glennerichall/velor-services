@@ -541,12 +541,16 @@ function createServiceProvider(serviceAware) {
                 // return proxy;
 
 
-                return new Proxy({}, {
+                return new Proxy(instance, {
                     has(target, prop) {
                         if (prop === Symbol.hasInstance) {
                             return true;
                         }
                         return prop in instance;
+                    },
+
+                    ownKeys(target) {
+                        return Object.keys(instance);
                     },
 
                     get(target, prop, receiver) {
