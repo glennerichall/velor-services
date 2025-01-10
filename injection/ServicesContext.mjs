@@ -1,7 +1,6 @@
 import {isClass} from "./isClass.mjs";
 import {getGlobalContext} from "velor-utils/utils/global.mjs";
 import {mergeDefaultServicesOptions} from "../application/services/mergeDefaultServicesOptions.mjs";
-import {bindReplaceResult} from "velor-utils/utils/proxy.mjs";
 
 let __id__ = 0;
 
@@ -23,7 +22,7 @@ let kScopes = Symbol('services-scopes');
 let kServicesFlag = Symbol('is-services');
 let kBuilder = Symbol('services-builder');
 let kProxyTarget = Symbol('services-proxy-target');
-let kServicesAware = Symbol('services-aware');
+// let kServicesAware = Symbol('services-aware');
 
 // --------------------------------------------------------------------------------------------
 // Public functions
@@ -62,12 +61,12 @@ export function createAppServicesInstance(options = {}) {
         env = {},
         factories = {},
         constants = {},
-        id = 'context',
         classes = {},
-        type = 'none'
+        type = 'none',
+        scopes = {}
     } = options;
 
-    id = id + "::" + ++__id__;
+    let id = ++__id__;
     constants = {...constants};
     env = {...env};
     factories = {...factories};
@@ -77,29 +76,34 @@ export function createAppServicesInstance(options = {}) {
         get [kServicesFlag]() {
             return true;
         },
-        get id() {
-            return id;
-        },
         get type() {
             return type;
         },
         [kConstants]: constants,
         [kClasses]: classes,
         [kEnv]: env,
-        [kFactories]: factories
+        [kFactories]: factories,
+        [kUuid]: id
     };
 
-    let scopeNames = [SCOPE_SINGLETON, ...new Set(Object.keys(factories)
-        .map(key => findScopeNameHintForKey(rootServices, key)))];
+    let factoryScopes = Object.keys(factories)
+        .map(key => findScopeNameHintForKey(rootServices, key));
 
-    let services = new ServiceContext(rootServices);
+    let scopeNames = [...new Set([SCOPE_SINGLETON, ...factoryScopes, ...Object.keys(scopes)])]
+        .filter(name => name !== SCOPE_PROTOTYPE);
+
+    // let services = new ServiceContext(rootServices);
 
     for (let name of scopeNames) {
-        let scope = createScope(rootServices, name);
-        scope[kServices] = services;
+        let options = {
+            storeProvider: scopes[name]
+        };
+        createScope(rootServices, name, options);
     }
 
-    return services;
+    // return services;
+
+    return rootServices;
 }
 
 export function getServices(serviceAware) {
@@ -146,16 +150,18 @@ export function getInstanceBinder(holder) {
 }
 
 export function getServiceBuilder(serviceAware) {
-    let services = getServices(serviceAware);
-    let builder = services instanceof ServiceContext ?
-        services[kBuilder] :
-        createServiceBuilder(serviceAware);
+    // let services = getServices(serviceAware);
+    // let builder = services instanceof ServiceContext ?
+    //     services[kBuilder] :
+    //     createServiceBuilder(serviceAware);
 
-    builder.extend = () => {
-        let childInstance = new ServiceContext(services);
-        getInstanceBinder(services).setInstancesTo(childInstance)
-        return getServiceBuilder(childInstance);
-    };
+    let builder = createServiceBuilder(serviceAware);
+
+    // builder.extend = () => {
+    //     let childInstance = new ServiceContext(services);
+    //     getInstanceBinder(services).setInstancesTo(childInstance)
+    //     return getServiceBuilder(childInstance);
+    // };
 
     return builder;
 }
@@ -197,16 +203,16 @@ export function getServiceBinder(serviceAware) {
             this.autoWire(instance);
             return instance;
         },
-        addScope(instance, scopeName, instances = {}) {
+        addScope(instance, scopeName, options) {
             if (!isServiceAware(instance)) {
                 this.autoWire(instance);
             }
-            createScope(instance, scopeName, instances);
+            createScope(instance, scopeName, options);
             return this;
         },
-        extend(instance, ...args) {
-            return this.createInstance(instance.constructor, ...args);
-        }
+        // extend(instance, ...args) {
+        //     return this.createInstance(instance.constructor, ...args);
+        // }
     }
 }
 
@@ -226,7 +232,7 @@ export function getScopeNames(serviceAware) {
 
 export function isInstanceOf(servicesAware, clazz) {
     return (isServiceAware(servicesAware) &&
-        unpackProxy(servicesAware) instanceof clazz) ||
+            unpackProxy(servicesAware) instanceof clazz) ||
         servicesAware instanceof clazz;
 }
 
@@ -243,22 +249,22 @@ export function isProxy(instance) {
     return !!instance[kProxyTarget];
 }
 
-export const ServiceAwareMixin = Parent => class extends Parent {
-    constructor(...args) {
-        super(...args);
-    }
-
-    get [kServicesAware]() {
-        return true;
-    }
-
-    get isServiceAware() {
-        return this[kServicesAware];
-    }
-}
-
-export const ServiceAware = ServiceAwareMixin(class {
-});
+// export const ServiceAwareMixin = Parent => class extends Parent {
+//     constructor(...args) {
+//         super(...args);
+//     }
+//
+//     get [kServicesAware]() {
+//         return true;
+//     }
+//
+//     get isServiceAware() {
+//         return this[kServicesAware];
+//     }
+// }
+//
+// export const ServiceAware = ServiceAwareMixin(class {
+// });
 
 // --------------------------------------------------------------------------------------------
 // Private functions
@@ -275,8 +281,8 @@ function createServiceBuilder(serviceAware) {
         done() {
             return services;
         },
-        addScope(name, instances = {}) {
-            createScope(services, name, instances);
+        addScope(name, options) {
+            createScope(services, name, options);
             return this;
         },
         addScopes(scopes) {
@@ -335,76 +341,76 @@ function createServiceBuilder(serviceAware) {
     }
 }
 
-class ServiceContext {
-    #id;
-    #parent;
-    #localServices = {
-        get [kServicesFlag]() {
-            return true;
-        },
-        [kClasses]: {},
-        [kEnv]: {},
-        [kConstants]: {},
-        [kFactories]: {},
-        [kScopes]: {},
-    };
-
-    constructor(parent) {
-        this.#parent = parent;
-        this.#id = __id__++;
-    }
-
-    get [kUuid]() {
-        return this.#id;
-    }
-
-    get [kServicesFlag]() {
-        return true;
-    }
-
-    get [kBuilder]() {
-        let builder = createServiceBuilder(this.#localServices);
-        bindReplaceResult(builder, 'done', () => {
-            return this;
-        });
-        return builder;
-    }
-
-    get [kClasses]() {
-        return Object.freeze({
-            ...this.#parent[kClasses],
-            ...this.#localServices[kClasses]
-        });
-    }
-
-    get [kScopes]() {
-        return Object.freeze({
-            ...this.#parent[kScopes],
-            ...this.#localServices[kScopes]
-        });
-    }
-
-    get [kConstants]() {
-        return Object.freeze({
-            ...this.#parent[kConstants],
-            ...this.#localServices[kConstants]
-        });
-    }
-
-    get [kFactories]() {
-        return Object.freeze({
-            ...this.#parent[kFactories],
-            ...this.#localServices[kFactories]
-        });
-    }
-
-    get [kEnv]() {
-        return Object.freeze({
-            ...this.#parent[kEnv],
-            ...this.#localServices[kEnv]
-        });
-    }
-}
+// class ServiceContext {
+//     #id;
+//     #parent;
+//     #localServices = {
+//         get [kServicesFlag]() {
+//             return true;
+//         },
+//         [kClasses]: {},
+//         [kEnv]: {},
+//         [kConstants]: {},
+//         [kFactories]: {},
+//         [kScopes]: {},
+//     };
+//
+//     constructor(parent) {
+//         this.#parent = parent;
+//         this.#id = __id__++;
+//     }
+//
+//     get [kUuid]() {
+//         return this.#id;
+//     }
+//
+//     get [kServicesFlag]() {
+//         return true;
+//     }
+//
+//     get [kBuilder]() {
+//         let builder = createServiceBuilder(this.#localServices);
+//         bindReplaceResult(builder, 'done', () => {
+//             return this;
+//         });
+//         return builder;
+//     }
+//
+//     get [kClasses]() {
+//         return Object.freeze({
+//             ...this.#parent[kClasses],
+//             ...this.#localServices[kClasses]
+//         });
+//     }
+//
+//     get [kScopes]() {
+//         return Object.freeze({
+//             ...this.#parent[kScopes],
+//             ...this.#localServices[kScopes]
+//         });
+//     }
+//
+//     get [kConstants]() {
+//         return Object.freeze({
+//             ...this.#parent[kConstants],
+//             ...this.#localServices[kConstants]
+//         });
+//     }
+//
+//     get [kFactories]() {
+//         return Object.freeze({
+//             ...this.#parent[kFactories],
+//             ...this.#localServices[kFactories]
+//         });
+//     }
+//
+//     get [kEnv]() {
+//         return Object.freeze({
+//             ...this.#parent[kEnv],
+//             ...this.#localServices[kEnv]
+//         });
+//     }
+// }
 
 function getServiceDirect(serviceAware) {
     return serviceAware && serviceAware[kServicesFlag] && serviceAware;
@@ -429,22 +435,71 @@ function getServiceArguments(serviceAware) {
     return undefined;
 }
 
-function createScope(tiedTo, name, instances = {}) {
+class Scope {
+    #getStore;
+    #holder;
+    #name;
 
-    if (tiedTo && !tiedTo[kScopes]) {
-        tiedTo[kScopes] = {};
+    constructor(name, holder, storeProviderOrStoreObject = {}) {
+        this.#holder = holder;
+        this.#name = name;
+
+        if (typeof storeProviderOrStoreObject === 'function') {
+            let provider = storeProviderOrStoreObject;
+            this.#getStore = provider;
+        } else {
+            let store = storeProviderOrStoreObject;
+            this.#getStore = () => store;
+        }
     }
 
-    instances = {...instances}; // ensure holder is cloned so it is immutable outside
-    let scope = {
-        name,
-        instances,
-        tiedTo
-    };
-
-    if (tiedTo && !tiedTo[kScopes][name]) {
-        tiedTo[kScopes][name] = scope;
+    get name() {
+        return this.#name;
     }
+
+    get holder() {
+        return this.#holder;
+    }
+
+    getStore() {
+        return this.#getStore();
+    }
+
+    get(key) {
+        return this.getStore()[key];
+    }
+
+    set(key, value) {
+        return this.getStore()[key] = value;
+    }
+
+    setAll(instances) {
+        for (let key in instances) {
+            this.set(key, instances[key]);
+        }
+    }
+}
+
+function createScope(holder, name,
+                     {
+                         instances = {},
+                         storeProvider
+                     } = {}) {
+
+    if (holder && !holder[kScopes]) {
+        // add a private scope property to the scope holder
+        holder[kScopes] = {};
+    }
+
+    let scope = new Scope(name, holder, storeProvider);
+
+    // add the newly created scope to the scopes of the scope holder
+    if (holder && !holder[kScopes][name]) {
+        holder[kScopes][name] = scope;
+    }
+
+    // add any new instances
+    scope.setAll(instances);
 
     return scope;
 }
@@ -531,11 +586,11 @@ function provideInstance(serviceAware, key, args) {
     let scopes = getScopes(services);
     for (let scopeName in scopes) {
         let scope = scopes[scopeName];
-        instance = scope.instances[key];
+        instance = scope.get(key);
         if (instance) {
             // this should not occur, but if it is not already a service aware make it.
             if (!isServiceAware(instance)) {
-                getServiceBinder(scope[kServices] ?? services).makeServiceAware(instance);
+                getServiceBinder(services).makeServiceAware(instance);
             }
             break;
         }
@@ -543,65 +598,65 @@ function provideInstance(serviceAware, key, args) {
 
     // no instance found in scopes, just create a new instance
     if (instance === undefined) {
-        instance = getServiceBinder(scope[kServices] ?? services).createInstance(key, ...args);
+        instance = getServiceBinder(services).createInstance(key, ...args);
         // for prototype scope, a new instance is created on each call
         // consequently we do not save the instance in scopes
         if (scopeNameHint !== SCOPE_PROTOTYPE) {
-            scope.instances[key] = instance;
+            scope.set(key, instance);
         }
     }
 
     return instance;
 }
 
-function makeServiceAwareProxy(instance, serviceAware) {
-    return new Proxy(instance, {
-        has(target, prop) {
-            if (prop === Symbol.hasInstance) {
-                return true;
-            }
-            return prop in instance;
-        },
-
-        ownKeys(target) {
-            return Object.keys(instance);
-        },
-
-        get(target, prop, receiver) {
-            if (prop === Symbol.toStringTag ||
-                prop === Symbol.iterator ||
-                prop === Symbol.hasInstance) {
-                return instance[prop];
-
-            } else if (prop === kProxyTarget) {
-                return instance;
-
-            } else if (prop === kServices) {
-                return getServices(serviceAware);
-
-            } else if (prop in instance) {
-                const value = Reflect.get(instance, prop, receiver);
-                if (typeof value === "function") {
-                    if (prop !== "constructor") {
-                        if (!value.hasOwnProperty('prototype')) {
-
-                            // All methods in original instance are now bound to the current proxy instance.
-                            // This imposes that no private #property is declared in instance classes.
-                            return value.bind(receiver);
-                        }
-                    }
-                }
-                return value;
-            }
-            return undefined;
-        },
-
-        set(target, prop, value, receiver) {
-            Reflect.set(instance, prop, value);
-            return true; // Indicates success
-        },
-    });
-}
+// function makeServiceAwareProxy(instance, serviceAware) {
+//     return new Proxy(instance, {
+//         has(target, prop) {
+//             if (prop === Symbol.hasInstance) {
+//                 return true;
+//             }
+//             return prop in instance;
+//         },
+//
+//         ownKeys(target) {
+//             return Object.keys(instance);
+//         },
+//
+//         get(target, prop, receiver) {
+//             if (prop === Symbol.toStringTag ||
+//                 prop === Symbol.iterator ||
+//                 prop === Symbol.hasInstance) {
+//                 return instance[prop];
+//
+//             } else if (prop === kProxyTarget) {
+//                 return instance;
+//
+//             } else if (prop === kServices) {
+//                 return getServices(serviceAware);
+//
+//             } else if (prop in instance) {
+//                 const value = Reflect.get(instance, prop, receiver);
+//                 if (typeof value === "function") {
+//                     if (prop !== "constructor") {
+//                         if (!value.hasOwnProperty('prototype')) {
+//
+//                             // All methods in original instance are now bound to the current proxy instance.
+//                             // This imposes that no private #property is declared in instance classes.
+//                             return value.bind(receiver);
+//                         }
+//                     }
+//                 }
+//                 return value;
+//             }
+//             return undefined;
+//         },
+//
+//         set(target, prop, value, receiver) {
+//             Reflect.set(instance, prop, value);
+//             return true; // Indicates success
+//         },
+//     });
+// }
 
 function createServiceProvider(serviceAware) {
     return new Proxy({}, {
@@ -612,12 +667,13 @@ function createServiceProvider(serviceAware) {
                 // proxy[kServices] = getServices(serviceAware);
                 // return proxy;
 
-                if (instance[kServicesAware]) {
-                    return makeServiceAwareProxy(instance, serviceAware);
-                } else {
-                    return instance;
-                }
+                // if (instance[kServicesAware]) {
+                //     return makeServiceAwareProxy(instance, serviceAware);
+                // } else {
+                //     return instance;
+                // }
 
+                return instance;
 
             }
         }
