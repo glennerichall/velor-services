@@ -9,12 +9,10 @@ import {
     getServices,
     getUuid,
     isInstanceOf,
-    // isProxy,
     isServiceAware,
     SCOPE_PROTOTYPE,
     SCOPE_REQUEST,
     SCOPE_SINGLETON,
-    // ServiceAware,
 } from "../injection/ServicesContext.mjs";
 import sinon from "sinon";
 import {
@@ -804,6 +802,27 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         let keys = Object.keys(getProvider(services).a());
         expect(keys).to.deep.eq(['prop', 'getB']);
 
+    })
+
+    test('should redefine scope storage provider', () => {
+        let services = createAppServicesInstance({
+            factories: {
+                b: {
+                    scope: SCOPE_REQUEST,
+                    factory: () => {
+                        return {}
+                    }
+                },
+            }
+        });
+
+        let store = {};
+        getServiceBuilder(services).addScope(SCOPE_REQUEST, {
+            storeProvider: () => store
+        }).done();
+
+        let b = getProvider(services).b();
+        expect(getUuid(b)).to.eq(getUuid(store['b']));
     })
 
     test('should have AsyncLocalStorage request scope', async () => {

@@ -485,16 +485,13 @@ function createScope(holder, name,
                          instances = {},
                          storeProvider
                      } = {}) {
-
-    if (holder && !holder[kScopes]) {
-        // add a private scope property to the scope holder
-        holder[kScopes] = {};
-    }
-
     let scope = new Scope(name, holder, storeProvider);
 
-    // add the newly created scope to the scopes of the scope holder
-    if (holder && !holder[kScopes][name]) {
+    if (holder) {
+        if (!holder[kScopes]) {
+            // add a private scope property to the scope holder
+            holder[kScopes] = {};
+        }
         holder[kScopes][name] = scope;
     }
 
