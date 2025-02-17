@@ -3,7 +3,6 @@ import {
     createAppServicesInstance,
     getGlobalServices,
     getInstanceBinder,
-    getScopeNames,
     getServiceBinder,
     getServiceBuilder,
     getServices,
@@ -15,15 +14,13 @@ import {
     SCOPE_SINGLETON,
 } from "../injection/ServicesContext.mjs";
 import sinon from "sinon";
-import {
-    getEnvValue,
-    getProvider
-} from "../application/services/baseServices.mjs";
+import {getProvider} from "../application/services/baseServices.mjs";
 
 import {setupTestContext} from "velor-utils/test/setupTestContext.mjs";
 import {s_logger} from "../application/services/serviceKeys.mjs";
 import {getLogger} from "../application/services/services.mjs";
 import {AsyncLocalStorage} from 'node:async_hooks';
+import {timeoutAsync} from "velor-utils/utils/sync.mjs";
 
 // Example classes for testing
 class SingletonClass {
@@ -102,6 +99,322 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
             }
         });
     });
+
+
+    // test.skip('cloneWithScope should clone servicesContext with a new scope', function () {
+    //     let cloneServicesContext = getServiceBuilder(servicesContext)
+    //         .extend().addScope(SCOPE_REQUEST).done();
+    //     expect(cloneServicesContext).to.not.equal(servicesContext);
+    //     expect(isServiceAware(cloneServicesContext)).to.be.true;
+    // });
+    //
+    // test.skip('cloneWithScope clone should share parent scopes', function () {
+    //     let cloneServicesContext = getServiceBuilder(servicesContext)
+    //         .extend().addScope(SCOPE_REQUEST).done();
+    //
+    //     let obj1 = getProvider(cloneServicesContext).singletonService();
+    //     let obj2 = getProvider(cloneServicesContext).singletonService();
+    //
+    //     expect(getUuid(obj1)).to.not.be.undefined;
+    //     expect(getUuid(obj2)).to.not.be.undefined;
+    //
+    //     expect(getUuid(obj1)).to.equal(getUuid(obj2));
+    // });
+    //
+    // test.skip('cloneWithScope clone not should share new scope', function () {
+    //     let cloneServicesContext = getServiceBuilder(servicesContext)
+    //         .extend()
+    //         .addScope(SCOPE_REQUEST)
+    //         .done();
+    //
+    //     expect(getProvider(cloneServicesContext).requestService()).to.not
+    //         .equal(getProvider(servicesContext).requestService());
+    // });
+    //
+    // test.skip('services clone must convey all installed instances', async () => {
+    //     let obj1 = {
+    //         name: 'foobar'
+    //     };
+    //     let holder = {};
+    //
+    //     let symbol = Symbol('test');
+    //
+    //     getInstanceBinder(servicesContext).setInstance(symbol, obj1);
+    //
+    //     let clone = getServiceBuilder(servicesContext)
+    //         .extend()
+    //         .done();
+    //
+    //     expect(areSame(getProvider(clone)[symbol](), obj1)).to.be.true;
+    //
+    //     getServiceBinder(clone).makeServiceAware(holder);
+    //
+    //     let obj2 = getProvider(holder)[symbol]();
+    //     expect(areSame(obj2, obj1)).to.be.true;
+    //
+    // });
+    //
+    // test.skip('should chain service inheritance', async () => {
+    //
+    //     getServiceBuilder(servicesContext)
+    //         .addEnv("env1", 10)
+    //         .addEnv("env2", 20)
+    //         .done();
+    //
+    //     expect(getEnvValue(servicesContext, "env1")).to.equal(10);
+    //     expect(getEnvValue(servicesContext, "env2")).to.equal(20);
+    //
+    //     let clone = getServiceBuilder(servicesContext)
+    //         .extend()
+    //         .addEnv("env2", 30)
+    //         .addEnv("env3", 40)
+    //         .done();
+    //
+    //     expect(getEnvValue(clone, "env1")).to.equal(10);
+    //     expect(getEnvValue(clone, "env2")).to.equal(30);
+    //     expect(getEnvValue(clone, "env3")).to.equal(40);
+    // })
+    //
+    // test.skip('should only create scope in clone', () => {
+    //     let services = createAppServicesInstance();
+    //
+    //     let clone = getServiceBuilder(services).extend()
+    //         .addScope(SCOPE_REQUEST).done();
+    //
+    //     expect(getScopeNames(services)).to.deep.eq([SCOPE_SINGLETON]);
+    //     expect(getScopeNames(clone)).to.deep.eq([SCOPE_SINGLETON, SCOPE_REQUEST]);
+    // })
+    //
+    // test.skip('should create scopes for provided factories', () => {
+    //     let services = createAppServicesInstance({
+    //         factories: {
+    //             dummy: {
+    //                 scope: SCOPE_REQUEST,
+    //                 factory: () => null
+    //             }
+    //         }
+    //     });
+    //
+    //     let clone = getServiceBuilder(services).extend()
+    //         .addScope("dummy").done();
+    //
+    //     expect(getScopeNames(services)).to.deep.eq([SCOPE_SINGLETON, SCOPE_REQUEST]);
+    //     expect(getScopeNames(clone)).to.deep.eq([SCOPE_SINGLETON, SCOPE_REQUEST, "dummy"]);
+    // })
+    //
+    // test.skip('should create instance and put in parent services scopes', () => {
+    //     let a = {};
+    //
+    //     let aFactory = sinon.stub().returns(a);
+    //
+    //     let services = createAppServicesInstance({
+    //         factories: {
+    //             a: aFactory,
+    //         }
+    //     });
+    //
+    //     let clone = getServiceBuilder(services)
+    //         .extend().done();
+    //
+    //     // Clone of services is created.
+    //     // "a" instance is not created initially.
+    //     // "a" should have been placed into original services singleton scope even if created
+    //     // when calling provider on clone services, because clone has no scopes declared.
+    //     expect(getUuid(getProvider(clone).a())).to.eq(getUuid(a));
+    //     expect(getUuid(getProvider(services).a())).to.eq(getUuid(a));
+    //     expect(getServices(a)).to.eq(services);
+    //
+    //     expect(getUuid(getProvider(clone).a())).to.not.be.undefined;
+    //
+    //     expect(aFactory).calledOnce;
+    // })
+    //
+    // test.skip('should create instance and put in grand-parent services scopes', () => {
+    //     let a = {};
+    //
+    //     let aFactory = sinon.stub().returns(a);
+    //
+    //     let services = createAppServicesInstance({
+    //         factories: {
+    //             a: aFactory,
+    //         }
+    //     });
+    //
+    //     let subclone = getServiceBuilder(services)
+    //         .extend().extend().done();
+    //
+    //     expect(getUuid(getProvider(subclone).a())).to.eq(getUuid(a));
+    //     expect(getUuid(getProvider(services).a())).to.eq(getUuid(a));
+    //
+    //     expect(getServices(a)).to.eq(services);
+    //
+    //     expect(aFactory).calledOnce;
+    // })
+    //
+    // test.skip('should handle scope redeclaration correctly', async () => {
+    //     class MyClass extends ServiceAware {
+    //         getB() {
+    //             return getProvider(this).b();
+    //         }
+    //     }
+    //
+    //     let a = new MyClass();
+    //
+    //     let aFactory = sinon.stub().returns(a);
+    //     let bFactory = sinon.stub().callsFake(() => {
+    //         return {};
+    //     });
+    //
+    //     let services = createAppServicesInstance({
+    //         factories: {
+    //             a: aFactory,
+    //             b: {
+    //                 scope: SCOPE_REQUEST,
+    //                 factory: bFactory
+    //             },
+    //         }
+    //     });
+    //
+    //     let clone = getServiceBuilder(services).extend()
+    //         .addScope(SCOPE_REQUEST).done();
+    //
+    //     // "b1" is in clone
+    //     let b1 = getProvider(clone).b();
+    //     expect(getServices(b1)).to.eq(clone);
+    //
+    //     // "b2" is also in clone
+    //     let b2 = getProvider(clone).a().getB();
+    //     expect(getServices(b2)).to.eq(clone);
+    //
+    //     expect(getUuid(b2)).to.eq(getUuid(b1));
+    //
+    //
+    // })
+    //
+    // test.skip('should get another instance from service aware instance', async () => {
+    //     class MyClass {
+    //         prop = 'value';
+    //
+    //         getB() {
+    //             return getProvider(this).b();
+    //         }
+    //     }
+    //
+    //     let a = new MyClass();
+    //
+    //     let aFactory = sinon.stub().returns(a);
+    //     let bFactory = sinon.stub().callsFake(() => {
+    //         return {};
+    //     });
+    //
+    //     let services = createAppServicesInstance({
+    //         factories: {
+    //             a: aFactory,
+    //             b: {
+    //                 scope: SCOPE_REQUEST,
+    //                 factory: bFactory
+    //             },
+    //         }
+    //     });
+    //
+    //
+    //     let clone = getServiceBuilder(services).extend()
+    //         .addScope(SCOPE_REQUEST).done();
+    //
+    //     let bInstance1 = getProvider(clone).a().getB();
+    //     let bInstance2 = getProvider(clone).a().getB();
+    //     let bInstance3 = getProvider(services).a().getB();
+    //
+    //     expect(getServices(bInstance1)).to.eq(clone);
+    //     expect(getServices(bInstance2)).to.eq(clone);
+    //     expect(getServices(bInstance3)).to.eq(services);
+    //
+    //     expect(getUuid(bInstance1)).to.eq(getUuid(bInstance2));
+    //     expect(getUuid(bInstance2)).to.not.eq(getUuid(bInstance3));
+    //
+    //     expect(getUuid(bInstance2)).to.not.be.undefined;
+    //     expect(getUuid(bInstance3)).to.not.be.undefined;
+    //
+    // })
+    //
+    // test.skip('should not get object as proxy if not service aware', () => {
+    //
+    //     class MyClass {
+    //     }
+    //
+    //     let a = new MyClass();
+    //
+    //     let aFactory = sinon.stub().returns(a);
+    //     let services = createAppServicesInstance({
+    //         factories: {
+    //             a: aFactory,
+    //         }
+    //     });
+    //
+    //     expect(isProxy(getProvider(services).a())).to.be.false;
+    // })
+    //
+    // test.skip('should get object as proxy if service aware', () => {
+    //
+    //     class MyClass extends ServiceAware {
+    //     }
+    //
+    //     let a = new MyClass();
+    //
+    //     let aFactory = sinon.stub().returns(a);
+    //     let services = createAppServicesInstance({
+    //         factories: {
+    //             a: aFactory,
+    //         }
+    //     });
+    //
+    //     expect(isProxy(getProvider(services).a())).to.be.true;
+    // })
+    //
+    // test.skip('should bind to functions', () => {
+    //
+    //     class MyClass extends ServiceAware {
+    //         freeFct = () => {
+    //             if (!this || isProxy(this)) {
+    //                 throw new Error();
+    //             }
+    //         }
+    //
+    //         notSoFree = function () {
+    //             if (!this || !isProxy(this)) {
+    //                 throw new Error();
+    //             }
+    //         }
+    //
+    //         method() {
+    //             if (!this || !isProxy(this)) {
+    //                 throw new Error();
+    //             }
+    //         }
+    //     }
+    //
+    //     let a = new MyClass();
+    //
+    //     function freeMeToo() {
+    //         if (!this || !isProxy(this)) {
+    //             throw new Error();
+    //         }
+    //     }
+    //
+    //     a.freeMeToo = freeMeToo;
+    //
+    //     let aFactory = sinon.stub().returns(a);
+    //     let services = createAppServicesInstance({
+    //         factories: {
+    //             a: aFactory,
+    //         }
+    //     });
+    //
+    //     getProvider(services).a().freeFct();
+    //     getProvider(services).a().freeMeToo();
+    //     getProvider(services).a().method();
+    //     getProvider(services).a().notSoFree();
+    // })
 
     test('should get uuid of services', () => {
         let uuid = getUuid(servicesContext);
@@ -467,321 +780,6 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         expect(instance.getProp1("_toto")).to.eq('value1_in_getter_toto');
     })
 
-    test.skip('cloneWithScope should clone servicesContext with a new scope', function () {
-        let cloneServicesContext = getServiceBuilder(servicesContext)
-            .extend().addScope(SCOPE_REQUEST).done();
-        expect(cloneServicesContext).to.not.equal(servicesContext);
-        expect(isServiceAware(cloneServicesContext)).to.be.true;
-    });
-
-    test.skip('cloneWithScope clone should share parent scopes', function () {
-        let cloneServicesContext = getServiceBuilder(servicesContext)
-            .extend().addScope(SCOPE_REQUEST).done();
-
-        let obj1 = getProvider(cloneServicesContext).singletonService();
-        let obj2 = getProvider(cloneServicesContext).singletonService();
-
-        expect(getUuid(obj1)).to.not.be.undefined;
-        expect(getUuid(obj2)).to.not.be.undefined;
-
-        expect(getUuid(obj1)).to.equal(getUuid(obj2));
-    });
-
-    test.skip('cloneWithScope clone not should share new scope', function () {
-        let cloneServicesContext = getServiceBuilder(servicesContext)
-            .extend()
-            .addScope(SCOPE_REQUEST)
-            .done();
-
-        expect(getProvider(cloneServicesContext).requestService()).to.not
-            .equal(getProvider(servicesContext).requestService());
-    });
-
-    test.skip('services clone must convey all installed instances', async () => {
-        let obj1 = {
-            name: 'foobar'
-        };
-        let holder = {};
-
-        let symbol = Symbol('test');
-
-        getInstanceBinder(servicesContext).setInstance(symbol, obj1);
-
-        let clone = getServiceBuilder(servicesContext)
-            .extend()
-            .done();
-
-        expect(areSame(getProvider(clone)[symbol](), obj1)).to.be.true;
-
-        getServiceBinder(clone).makeServiceAware(holder);
-
-        let obj2 = getProvider(holder)[symbol]();
-        expect(areSame(obj2, obj1)).to.be.true;
-
-    });
-
-    test.skip('should chain service inheritance', async () => {
-
-        getServiceBuilder(servicesContext)
-            .addEnv("env1", 10)
-            .addEnv("env2", 20)
-            .done();
-
-        expect(getEnvValue(servicesContext, "env1")).to.equal(10);
-        expect(getEnvValue(servicesContext, "env2")).to.equal(20);
-
-        let clone = getServiceBuilder(servicesContext)
-            .extend()
-            .addEnv("env2", 30)
-            .addEnv("env3", 40)
-            .done();
-
-        expect(getEnvValue(clone, "env1")).to.equal(10);
-        expect(getEnvValue(clone, "env2")).to.equal(30);
-        expect(getEnvValue(clone, "env3")).to.equal(40);
-    })
-
-    test.skip('should only create scope in clone', () => {
-        let services = createAppServicesInstance();
-
-        let clone = getServiceBuilder(services).extend()
-            .addScope(SCOPE_REQUEST).done();
-
-        expect(getScopeNames(services)).to.deep.eq([SCOPE_SINGLETON]);
-        expect(getScopeNames(clone)).to.deep.eq([SCOPE_SINGLETON, SCOPE_REQUEST]);
-    })
-
-    test.skip('should create scopes for provided factories', () => {
-        let services = createAppServicesInstance({
-            factories: {
-                dummy: {
-                    scope: SCOPE_REQUEST,
-                    factory: () => null
-                }
-            }
-        });
-
-        let clone = getServiceBuilder(services).extend()
-            .addScope("dummy").done();
-
-        expect(getScopeNames(services)).to.deep.eq([SCOPE_SINGLETON, SCOPE_REQUEST]);
-        expect(getScopeNames(clone)).to.deep.eq([SCOPE_SINGLETON, SCOPE_REQUEST, "dummy"]);
-    })
-
-    test.skip('should create instance and put in parent services scopes', () => {
-        let a = {};
-
-        let aFactory = sinon.stub().returns(a);
-
-        let services = createAppServicesInstance({
-            factories: {
-                a: aFactory,
-            }
-        });
-
-        let clone = getServiceBuilder(services)
-            .extend().done();
-
-        // Clone of services is created.
-        // "a" instance is not created initially.
-        // "a" should have been placed into original services singleton scope even if created
-        // when calling provider on clone services, because clone has no scopes declared.
-        expect(getUuid(getProvider(clone).a())).to.eq(getUuid(a));
-        expect(getUuid(getProvider(services).a())).to.eq(getUuid(a));
-        expect(getServices(a)).to.eq(services);
-
-        expect(getUuid(getProvider(clone).a())).to.not.be.undefined;
-
-        expect(aFactory).calledOnce;
-    })
-
-    test.skip('should create instance and put in grand-parent services scopes', () => {
-        let a = {};
-
-        let aFactory = sinon.stub().returns(a);
-
-        let services = createAppServicesInstance({
-            factories: {
-                a: aFactory,
-            }
-        });
-
-        let subclone = getServiceBuilder(services)
-            .extend().extend().done();
-
-        expect(getUuid(getProvider(subclone).a())).to.eq(getUuid(a));
-        expect(getUuid(getProvider(services).a())).to.eq(getUuid(a));
-
-        expect(getServices(a)).to.eq(services);
-
-        expect(aFactory).calledOnce;
-    })
-
-    test.skip('should handle scope redeclaration correctly', async () => {
-        class MyClass extends ServiceAware {
-            getB() {
-                return getProvider(this).b();
-            }
-        }
-
-        let a = new MyClass();
-
-        let aFactory = sinon.stub().returns(a);
-        let bFactory = sinon.stub().callsFake(() => {
-            return {};
-        });
-
-        let services = createAppServicesInstance({
-            factories: {
-                a: aFactory,
-                b: {
-                    scope: SCOPE_REQUEST,
-                    factory: bFactory
-                },
-            }
-        });
-
-        let clone = getServiceBuilder(services).extend()
-            .addScope(SCOPE_REQUEST).done();
-
-        // "b1" is in clone
-        let b1 = getProvider(clone).b();
-        expect(getServices(b1)).to.eq(clone);
-
-        // "b2" is also in clone
-        let b2 = getProvider(clone).a().getB();
-        expect(getServices(b2)).to.eq(clone);
-
-        expect(getUuid(b2)).to.eq(getUuid(b1));
-
-
-    })
-
-    test.skip('should get another instance from service aware instance', async () => {
-        class MyClass {
-            prop = 'value';
-
-            getB() {
-                return getProvider(this).b();
-            }
-        }
-
-        let a = new MyClass();
-
-        let aFactory = sinon.stub().returns(a);
-        let bFactory = sinon.stub().callsFake(() => {
-            return {};
-        });
-
-        let services = createAppServicesInstance({
-            factories: {
-                a: aFactory,
-                b: {
-                    scope: SCOPE_REQUEST,
-                    factory: bFactory
-                },
-            }
-        });
-
-
-        let clone = getServiceBuilder(services).extend()
-            .addScope(SCOPE_REQUEST).done();
-
-        let bInstance1 = getProvider(clone).a().getB();
-        let bInstance2 = getProvider(clone).a().getB();
-        let bInstance3 = getProvider(services).a().getB();
-
-        expect(getServices(bInstance1)).to.eq(clone);
-        expect(getServices(bInstance2)).to.eq(clone);
-        expect(getServices(bInstance3)).to.eq(services);
-
-        expect(getUuid(bInstance1)).to.eq(getUuid(bInstance2));
-        expect(getUuid(bInstance2)).to.not.eq(getUuid(bInstance3));
-
-        expect(getUuid(bInstance2)).to.not.be.undefined;
-        expect(getUuid(bInstance3)).to.not.be.undefined;
-
-    })
-
-    test.skip('should not get object as proxy if not service aware', () => {
-
-        class MyClass {
-        }
-
-        let a = new MyClass();
-
-        let aFactory = sinon.stub().returns(a);
-        let services = createAppServicesInstance({
-            factories: {
-                a: aFactory,
-            }
-        });
-
-        expect(isProxy(getProvider(services).a())).to.be.false;
-    })
-
-    test.skip('should get object as proxy if service aware', () => {
-
-        class MyClass extends ServiceAware {
-        }
-
-        let a = new MyClass();
-
-        let aFactory = sinon.stub().returns(a);
-        let services = createAppServicesInstance({
-            factories: {
-                a: aFactory,
-            }
-        });
-
-        expect(isProxy(getProvider(services).a())).to.be.true;
-    })
-
-    test.skip('should bind to functions', () => {
-
-        class MyClass extends ServiceAware {
-            freeFct = () => {
-                if (!this || isProxy(this)) {
-                    throw new Error();
-                }
-            }
-
-            notSoFree = function () {
-                if (!this || !isProxy(this)) {
-                    throw new Error();
-                }
-            }
-
-            method() {
-                if (!this || !isProxy(this)) {
-                    throw new Error();
-                }
-            }
-        }
-
-        let a = new MyClass();
-
-        function freeMeToo() {
-            if (!this || !isProxy(this)) {
-                throw new Error();
-            }
-        }
-
-        a.freeMeToo = freeMeToo;
-
-        let aFactory = sinon.stub().returns(a);
-        let services = createAppServicesInstance({
-            factories: {
-                a: aFactory,
-            }
-        });
-
-        getProvider(services).a().freeFct();
-        getProvider(services).a().freeMeToo();
-        getProvider(services).a().method();
-        getProvider(services).a().notSoFree();
-    })
-
     test('should enumerate own keys', () => {
         const sym = Symbol();
         let a = {
@@ -879,5 +877,36 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
 
         expect(getUuid(a3)).to.eq(getUuid(a1));
         expect(getUuid(b4)).to.not.eq(getUuid(b1));
+    })
+
+    test('should provide async', async () => {
+
+        let instance = {
+            async initialize() {
+                await timeoutAsync(100);
+                this.isInitialized = true;
+            }
+        };
+        let services = createAppServicesInstance({
+            factories: {
+                a: async () => {
+                    await timeoutAsync(100);
+                    return instance;
+                }
+            }
+        });
+
+        let ia = await getProvider(services).a();
+        expect(ia).to.eq(instance);
+
+        expect(isServiceAware(ia)).to.be.true;
+
+        let ib = getProvider(services).a();
+        expect(ib).to.eq(instance);
+
+        let ic = await getProvider(services).a();
+        expect(ic).to.eq(instance);
+
+        expect(instance).to.have.property('isInitialized', true);
     })
 });

@@ -1,6 +1,7 @@
 import {isClass} from "./isClass.mjs";
 import {getGlobalContext} from "velor-utils/utils/global.mjs";
 import {mergeDefaultServicesOptions} from "../application/services/mergeDefaultServicesOptions.mjs";
+import {getLogger} from "../application/services/services.mjs";
 
 let __id__ = 0;
 
@@ -177,12 +178,15 @@ export function getServiceBinder(serviceAware) {
         autoWire(instance) {
             this.makeServiceAware(instance);
             if (typeof instance.initialize === 'function') {
-                let result = instance.initialize();
-                if (result instanceof Promise) {
-                    result.catch(e => console.error(e))
+                let initResult = instance.initialize();
+                if (initResult instanceof Promise) {
+                    let objInstance = instance;
+                    instance = initResult
+                        .then(() => objInstance)
+                        .catch(e => getLogger(serviceAware).error(e));
                 }
             }
-            return this;
+            return instance;
         },
         createInstance(classOrKey, ...args) {
             let instance;
@@ -200,7 +204,11 @@ export function getServiceBinder(serviceAware) {
                 throw new Error("Provide a class or an instance key");
             }
             instance[kUuid] = ++instanceUuid;
-            this.autoWire(instance);
+            if (instance instanceof Promise) {
+                instance = instance.then(i => this.autoWire(i));
+            } else {
+                this.autoWire(instance);
+            }
             return instance;
         },
         addScope(instance, scopeName, options) {
@@ -596,10 +604,21 @@ function provideInstance(serviceAware, key, args) {
     // no instance found in scopes, just create a new instance
     if (instance === undefined) {
         instance = getServiceBinder(services).createInstance(key, ...args);
+
+        const saveInstance = instance => {
+            scope.set(key, instance);
+            return instance;
+        }
+
+
         // for prototype scope, a new instance is created on each call
         // consequently we do not save the instance in scopes
         if (scopeNameHint !== SCOPE_PROTOTYPE) {
-            scope.set(key, instance);
+            if (instance instanceof Promise) {
+                instance = instance.then(saveInstance);
+            } else {
+                saveInstance(instance);
+            }
         }
     }
 
