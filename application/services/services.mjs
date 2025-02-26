@@ -9,8 +9,8 @@ import {
     getInstanceBinder,
     isServiceAware
 } from "../../injection/ServicesContext.mjs";
-import winston from "winston";
 import {noOpLogger} from "velor-utils/utils/noOpLogger.mjs";
+import {isNode} from "velor-utils/utils/platform.mjs";
 
 export function getEnvNameResolver(serviceAware) {
     return getProvider(serviceAware)[s_envNameResolver]();
@@ -36,11 +36,7 @@ export function getLogger(servicesAware) {
 
     if (!logger) {
         if (process.env.LOG_LEVEL) {
-            logger = winston.createLogger({
-                level: process.env.LOG_LEVEL,
-                transports: [new winston.transports.Console()],
-                format: winston.format.simple(),
-            })
+            logger = console;
         } else {
             logger = noOpLogger
         }
