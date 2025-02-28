@@ -910,8 +910,7 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         expect(instance).to.have.property('isInitialized', true);
     })
 
-    test('should define factories for object', async () => {
-        let glb = {};
+    test('should define local services for service aware', async () => {
         let a = {};
 
         let b1 = {};
@@ -919,7 +918,6 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
 
         let options = {
             factories: {
-                glb: () => glb,
                 b: () => b2,
                 a: {
                     scope: SCOPE_SINGLETON,
@@ -940,6 +938,35 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
 
         expect(getProvider(aa).b()).to.eq(b1);
         expect(getProvider(services).b()).to.eq(b2);
+
+    })
+    test('should access instance of parent services', async () => {
+        let a = {};
+        let c = {};
+        let b1 = {
+            getC() {
+                return getProvider(this).c();
+            }
+        };
+
+        let options = {
+            factories: {
+                c: () => c,
+                a: {
+                    scope: SCOPE_SINGLETON,
+                    factory: () => a,
+                    services: {
+                        factories: {
+                            b: () => b1
+                        }
+                    }
+                },
+            }
+        };
+
+        let services = createAppServicesInstance(options);
+        let aa = getProvider(services).a();
+        expect(getProvider(aa).b().getC()).to.eq(c);
 
     })
 });
