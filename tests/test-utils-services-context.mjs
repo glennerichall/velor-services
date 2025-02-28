@@ -909,4 +909,37 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
 
         expect(instance).to.have.property('isInitialized', true);
     })
+
+    test('should define factories for object', async () => {
+        let glb = {};
+        let a = {};
+
+        let b1 = {};
+        let b2 = {};
+
+        let options = {
+            factories: {
+                glb: () => glb,
+                b: () => b2,
+                a: {
+                    scope: SCOPE_SINGLETON,
+                    factory: () => a,
+                    services: {
+                        factories: {
+                            b: () => b1
+                        }
+                    }
+                },
+            }
+        };
+
+        let services = createAppServicesInstance(options);
+
+        let aa = getProvider(services).a();
+        expect(aa).to.eq(a);
+
+        expect(getProvider(aa).b()).to.eq(b1);
+        expect(getProvider(services).b()).to.eq(b2);
+
+    })
 });
