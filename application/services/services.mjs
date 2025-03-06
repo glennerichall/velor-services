@@ -3,17 +3,22 @@ import {
     s_emitter,
     s_envNameResolver,
     s_eventQueue,
-    s_logger
+    s_localStorage,
+    s_logger,
+    s_storageNameResolver
 } from "./serviceKeys.mjs";
 import {
     getInstanceBinder,
     isServiceAware
 } from "../../injection/ServicesContext.mjs";
 import {noOpLogger} from "velor-utils/utils/noOpLogger.mjs";
-import {isNode} from "velor-utils/utils/platform.mjs";
 
 export function getEnvNameResolver(serviceAware) {
     return getProvider(serviceAware)[s_envNameResolver]();
+}
+
+export function getStorageNameResolver(serviceAware) {
+    return getProvider(serviceAware)[s_storageNameResolver]();
 }
 
 
@@ -51,4 +56,8 @@ export function getEmitter(services) {
 
 export function getEventQueue(services) {
     return getProvider(services)[s_eventQueue]();
+}
+
+export function getLocalStorage(services) {
+    return getProvider(services)[s_localStorage];
 }

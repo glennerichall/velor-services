@@ -940,6 +940,7 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         expect(getProvider(services).b()).to.eq(b2);
 
     })
+
     test('should access instance of parent services', async () => {
         let a = {};
         let c = {};
@@ -967,6 +968,10 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         let services = createAppServicesInstance(options);
         let aa = getProvider(services).a();
         expect(getProvider(aa).b().getC()).to.eq(c);
+
+    })
+
+    test('should throw error directly if not ServiceError', async () => {
 
     })
 });

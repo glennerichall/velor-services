@@ -1,5 +1,4 @@
 import {
-    ENV_NAME_PREFIX,
     getConstants as _getConstants,
     getEnvironment as _getEnvironment,
     getFactories as _getFactories,
@@ -15,6 +14,7 @@ import {
     ENV_TEST
 } from "velor-utils/env.mjs";
 import {isTrue} from "velor-utils/utils/predicates.mjs";
+import {ENV_NAME_PREFIX} from "./constantKeys.mjs";
 
 export function getNodeEnv(services) {
     return getEnvironment(services).NODE_ENV;

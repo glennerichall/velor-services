@@ -2,13 +2,13 @@ import {isClass} from "./isClass.mjs";
 import {getGlobalContext} from "velor-utils/utils/global.mjs";
 import {mergeDefaultServicesOptions} from "../application/services/mergeDefaultServicesOptions.mjs";
 import {getLogger} from "../application/services/services.mjs";
+import {ServicesError} from "./ServicesError.mjs";
 
 let __id__ = 0;
 
 export const SCOPE_SINGLETON = 'singleton';
 export const SCOPE_PROTOTYPE = 'prototype';
 export const SCOPE_REQUEST = 'request';
-export const ENV_NAME_PREFIX = Symbol('env_name_prefix');
 
 let instanceUuid = 0;
 let kUuid = Symbol('uuid');
@@ -67,7 +67,7 @@ export function getServices(serviceAware) {
             getServiceArguments(serviceAware);
 
         if (!services) {
-            throw new Error(`serviceAware must be a ServicesContext or an object aware of services`);
+            throw new ServicesError(`serviceAware must be a ServicesContext or an object aware of services`);
         }
         return services;
     } else {
@@ -135,12 +135,12 @@ export function getServiceBinder(serviceAware) {
                     instance = factory(services, ...args);
                     instance[kKey] = classOrKey;
                 } else {
-                    throw new Error(`Provide a factory function for key ${classOrKey?.toString()}`);
+                    throw new ServicesError(`Provide a factory function for key ${classOrKey?.toString()}`);
                 }
             } else if (isClass(classOrKey)) {
                 instance = new classOrKey(...args);
             } else {
-                throw new Error("Provide a class or an instance key");
+                throw new ServicesError("Provide a class or an instance key");
             }
 
             let localServices = getLocalServicesForKey(services, classOrKey);
@@ -280,7 +280,7 @@ function createServiceBuilder(serviceAware) {
         },
         clearScope(scopeName) {
             if (scopeName === SCOPE_SINGLETON) {
-                throw new Error('Clearing singleton scope is not allowed');
+                throw new ServicesError('Clearing singleton scope is not allowed');
             }
             let scope = getScope(services, scopeName);
             scope.instances = {};
@@ -558,7 +558,7 @@ function provideInstanceFromServices(services, key, args) {
     }
 
     if (!scope) {
-        throw new Error(`Define scope "${scopeName}" in ServicesContext`);
+        throw new ServicesError(`Define scope "${scopeName}" in ServicesContext`);
     }
 
     // Remove-me, it should be clear where the instance is
@@ -632,6 +632,9 @@ function provideInstance(serviceAware, key, args) {
             return provideInstanceFromServices(services, key, args);
         } catch (e) {
             error = e;
+            if (!(error instanceof ServicesError)) {
+                break;
+            }
             services = services[kParentServices];
         }
     }
@@ -673,9 +676,9 @@ function getFactoryForKey(services, key) {
     let clazz = getClasses(services)[key];
     let factory;
     if (clazz && definition) {
-        throw new Error(`Provide a class or a factory for "${key?.toString()}" not both`);
+        throw new ServicesError(`Provide a class or a factory for "${key?.toString()}" not both`);
     } else if (!clazz && !definition) {
-        throw new Error(`Provide a factory or a class for "${key?.toString()}"`);
+        throw new ServicesError(`Provide a factory or a class for "${key?.toString()}"`);
     }
     if (typeof definition === 'object') {
         if (typeof definition.factory === 'function') {
