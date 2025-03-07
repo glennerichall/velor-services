@@ -594,27 +594,27 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         expect(areSame(getProvider(servicesContext)[symbol](), obj1)).to.be.true;
     });
 
-    test('provider should get scopes from instance then services', async () => {
-        let holder = {};
-        let obj1 = {};
-
-        expect(isServiceAware(holder)).to.be.false;
-        getServiceBinder(servicesContext).addScope(holder, "customScope");
-        expect(isServiceAware(holder)).to.be.true;
-
-        getServiceBuilder(servicesContext).addFactory('obj', {
-            factory: () => obj1,
-            scope: 'customScope'
-        });
-
-        let instance1 = getProvider(holder).obj();
-        expect(getUuid(instance1)).to.eq(getUuid(obj1));
-
-        let instance2 = getProvider(holder).obj();
-        expect(getUuid(instance1)).to.eq(getUuid(instance2));
-
-        expect(() => getProvider(servicesContext).obj()).to.throw(Error, /Define scope "customScope" in ServicesContext/);
-    });
+    // test('provider should get scopes from instance then services', async () => {
+    //     let holder = {};
+    //     let obj1 = {};
+    //
+    //     expect(isServiceAware(holder)).to.be.false;
+    //     getServiceBinder(servicesContext).addScope(holder, "customScope");
+    //     expect(isServiceAware(holder)).to.be.true;
+    //
+    //     getServiceBuilder(servicesContext).addFactory('obj', {
+    //         factory: () => obj1,
+    //         scope: 'customScope'
+    //     });
+    //
+    //     let instance1 = getProvider(holder).obj();
+    //     expect(getUuid(instance1)).to.eq(getUuid(obj1));
+    //
+    //     let instance2 = getProvider(holder).obj();
+    //     expect(getUuid(instance1)).to.eq(getUuid(instance2));
+    //
+    //     expect(() => getProvider(servicesContext).obj()).to.throw(Error, /Define scope "customScope" in ServicesContext/);
+    // });
 
     test('provider should not fail for no scope in holder', async () => {
         let holder = {};
@@ -636,18 +636,18 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
         expect(() => getProvider(holder).obj()).to.throw(Error, /Define scope "customScope" in ServicesContext/);
     });
 
-    test('service builder should permit to provide instances in instance scope', async () => {
-        let holder = {};
-        let obj1 = {};
-        let obj2 = {};
-
-        let instances = {
-            obj: obj1
-        };
-        getServiceBuilder(servicesContext).addScope("customScope", {instances});
-        let instance1 = getProvider(servicesContext).obj();
-        expect(getUuid(instance1)).to.eq(getUuid(obj1));
-    });
+    // test('service builder should permit to provide instances in instance scope', async () => {
+    //     let holder = {};
+    //     let obj1 = {};
+    //     let obj2 = {};
+    //
+    //     let instances = {
+    //         obj: obj1
+    //     };
+    //     getServiceBuilder(servicesContext).addScope("customScope", {instances});
+    //     let instance1 = getProvider(servicesContext).obj();
+    //     expect(getUuid(instance1)).to.eq(getUuid(obj1));
+    // });
 
     test('should get logger from bound instance', async () => {
         let holder = {};

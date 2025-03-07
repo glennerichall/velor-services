@@ -9,6 +9,7 @@ import {createEnvNameResolver} from "../factories/createEnvNameResolver.mjs";
 import {Emitter} from "velor-utils/utils/Emitter.mjs";
 import {createEventQueueInstance} from "../factories/createEventQueueInstance.mjs";
 import {createStorageNameResolver} from "../factories/createStorageNamesResolver.mjs";
+import {createLocalStorageInstance} from "../factories/createLocalStorageInstance.mjs";
 
 export const factories = {
     [s_envNameResolver]: createEnvNameResolver,
