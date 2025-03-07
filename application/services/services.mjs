@@ -59,5 +59,5 @@ export function getEventQueue(services) {
 }
 
 export function getLocalStorage(services) {
-    return getProvider(services)[s_localStorage];
+    return getProvider(services)[s_localStorage]();
 }
