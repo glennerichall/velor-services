@@ -190,7 +190,16 @@ export function isInstanceOf(servicesAware, clazz) {
 }
 
 export function getClasses(servicesAware) {
-    return {...getServices(servicesAware)[kClasses]};
+    let services = getServices(servicesAware);
+    let classes = {};
+    while (services) {
+        classes = {
+            ...services[kClasses],
+            ...classes,
+        };
+        services = services[kParentServices];
+    }
+    return classes;
 }
 
 export function areSame(instance1, instance2) {

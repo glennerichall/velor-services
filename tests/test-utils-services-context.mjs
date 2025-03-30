@@ -1,6 +1,7 @@
 import {
     areSame,
     createAppServicesInstance,
+    getClasses,
     getGlobalServices,
     getInstanceBinder,
     getServiceBinder,
@@ -1030,5 +1031,51 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
 
     test('should throw error directly if not ServiceError', async () => {
 
+    })
+
+    test('should merge classes', async () => {
+        class A1 {
+        }
+
+        class A2 {
+        }
+
+        class B {
+        }
+
+        class D {
+        }
+
+        let options = {
+            classes: {
+                a: A1,
+                b: B
+            },
+            factories: {
+                c: {
+                    factory: () => {
+                        return {}
+                    },
+                    services: {
+                        classes: {
+                            a: A2,
+                            d: D
+                        }
+                    }
+                }
+            }
+        }
+        const services = createAppServicesInstance(options);
+        let c = getProvider(services).c();
+
+        let classes1 = getClasses(services);
+        expect(classes1).to.deep.eq({
+            a: A1, b: B
+        });
+
+        let classes2 = getClasses(c);
+        expect(classes2).to.deep.eq({
+            a: A2, b: B, d: D
+        });
     })
 });
