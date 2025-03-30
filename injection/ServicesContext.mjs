@@ -700,9 +700,7 @@ function getFactoryForKey(services, key) {
     let definition = getFactories(services)[key];
     let clazz = getClasses(services)[key];
     let factory;
-    if (clazz && definition) {
-        throw new ServicesError(`Provide a class or a factory for "${key?.toString()}" not both`);
-    } else if (!clazz && !definition) {
+    if (!clazz && !definition) {
         throw new ServicesError(`Provide a factory or a class for "${key?.toString()}"`);
     }
     if (typeof definition === 'object') {
