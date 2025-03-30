@@ -1,6 +1,6 @@
 {
   "name": "velor-services",
-  "version": "1.8.32",
+  "version": "1.8.33",
   "main": "index.js",
   "scripts": {
     "test": "npx playwright test"

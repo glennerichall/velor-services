@@ -10,6 +10,7 @@ import {
     isInstanceOf,
     isServiceAware,
     SCOPE_PROTOTYPE,
+    SCOPE_PROTOTYPE_WITH_CONTEXT,
     SCOPE_REQUEST,
     SCOPE_SINGLETON,
 } from "../injection/ServicesContext.mjs";
@@ -938,7 +939,63 @@ test.describe('ServicesContext and Provider (Scope Management) with Dependency I
 
         expect(getProvider(aa).b()).to.eq(b1);
         expect(getProvider(services).b()).to.eq(b2);
+    })
 
+    test('should pass service aware to local service factory', async () => {
+        let options = {
+            factories: {
+                a: {
+                    scope: SCOPE_SINGLETON,
+                    factory: () => {
+                        return {};
+                    },
+                    services: {
+                        factories: {
+                            b: (s) => {
+                                expect(getUuid(s)).to.not.eq(getUuid(services));
+                                expect(getUuid(s)).to.eq(getUuid(getServices(aa)));
+                                return {};
+                            }
+                        }
+                    }
+                },
+            }
+        };
+
+        let services = createAppServicesInstance(options);
+        let aa = getProvider(services).a();
+        getProvider(aa).b();
+    })
+
+    test('should keep reference to self', async () => {
+        let options = {
+            factories: {
+                a: {
+                    scope: SCOPE_PROTOTYPE_WITH_CONTEXT,
+                    factory: () => {
+                        return {};
+                    },
+                    services: {
+                        factories: {
+                            // A local context created instance may access the prototype owning the context
+                            b: (s) => {
+                                let self = getProvider(s).a();
+                                expect(getUuid(self)).to.eq(getUuid(aa1));
+                                return {};
+                            }
+                        }
+                    }
+                },
+            }
+        };
+
+        let services = createAppServicesInstance(options);
+        let aa1 = getProvider(services).a();
+        let aa2 = getProvider(services).a();
+        expect(getUuid(aa1)).to.not.eq(getUuid(aa2));
+        let aa3 = getProvider(aa1).a();
+        expect(getUuid(aa3)).to.eq(getUuid(aa1));
+        getProvider(aa1).b();
     })
 
     test('should access instance of parent services', async () => {

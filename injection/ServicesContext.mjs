@@ -4,10 +4,9 @@ import {mergeDefaultServicesOptions} from "../application/services/mergeDefaultS
 import {getLogger} from "../application/services/services.mjs";
 import {ServicesError} from "./ServicesError.mjs";
 
-let __id__ = 0;
-
 export const SCOPE_SINGLETON = 'singleton';
 export const SCOPE_PROTOTYPE = 'prototype';
+export const SCOPE_PROTOTYPE_WITH_CONTEXT = 'prototype_context';
 export const SCOPE_REQUEST = 'request';
 
 let instanceUuid = 0;
@@ -220,7 +219,7 @@ function createServicesInstance(options = {}) {
         parent = null
     } = options;
 
-    let id = ++__id__;
+    let id = ++instanceUuid;
     constants = {...constants};
     env = {...env};
     factories = {...factories};
@@ -245,7 +244,8 @@ function createServicesInstance(options = {}) {
         .map(key => findScopeNameHintForKey(services, key));
 
     let scopeNames = [...new Set([SCOPE_SINGLETON, ...factoryScopes, ...Object.keys(scopes)])]
-        .filter(name => name !== SCOPE_PROTOTYPE);
+        .filter(name => name !== SCOPE_PROTOTYPE)
+    // .filter(name => name !== SCOPE_PROTOTYPE_WITH_CONTEXT);
 
     for (let name of scopeNames) {
         let options = {
@@ -535,8 +535,43 @@ function getScopes(serviceAware) {
     };
 }
 
-function getScope(services, name) {
-    return getScopes(services)[name];
+function getScope(services, scopeName) {
+    let scope;
+
+    if (scopeName === SCOPE_PROTOTYPE) {
+        // Create a volatile scope for prototypes.
+        // This scope will not be retained on function return.
+        scope = {
+            get() {
+                // always empty
+                return undefined;
+            },
+            set(key, instance) {
+                // not retention
+            }
+        };
+    } else if (scopeName === SCOPE_PROTOTYPE_WITH_CONTEXT) {
+        // Create a volatile scope for prototypes with context.
+        // This scope will not be retained on function return.
+        // The scope saves the current instance reference to a local services context.
+        scope = {
+            get() {
+                // always empty
+                return undefined;
+            },
+            set(key, instance) {
+                let localServices = getServices(instance);
+                // Only keep a reference to the instance if the services context is a local one.
+                if (localServices !== services) {
+                    getInstanceBinder(localServices).setInstance(key, instance);
+                }
+            }
+        };
+    } else {
+        scope = getScopes(services)[scopeName];
+    }
+
+    return scope;
 }
 
 function provideInstanceFromServices(services, key, args) {
@@ -547,15 +582,7 @@ function provideInstanceFromServices(services, key, args) {
 
     // 4 - if not, find the scope of the key
     const scopeName = findScopeNameHintForKey(services, key);
-
-    // ensure the scope exists
     let scope = getScope(services, scopeName);
-
-    if (scopeName === SCOPE_PROTOTYPE) {
-        // Create a volatile scope for prototypes.
-        // This scope will not be retained on function return.
-        scope = createScope(null, SCOPE_PROTOTYPE);
-    }
 
     if (!scope) {
         throw new ServicesError(`Define scope "${scopeName}" in ServicesContext`);
@@ -590,12 +617,10 @@ function provideInstanceFromServices(services, key, args) {
 
         // for prototype scope, a new instance is created on each call
         // consequently we do not save the instance in scopes
-        if (scopeName !== SCOPE_PROTOTYPE) {
-            if (instance instanceof Promise) {
-                instance = instance.then(saveInstance);
-            } else {
-                saveInstance(instance);
-            }
+        if (instance instanceof Promise) {
+            instance = instance.then(saveInstance);
+        } else {
+            saveInstance(instance);
         }
     }
 
